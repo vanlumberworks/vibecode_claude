@@ -24,6 +24,8 @@ class PriceService:
 
     # API endpoints
     METAL_API_URL = "https://api.metalpriceapi.com/v1/latest"
+    METAL_HISTORICAL_URL = "https://api.metalpriceapi.com/v1"
+    METAL_OHLC_URL = "https://api.metalpriceapi.com/v1/ohlc"
     FOREX_API_URL = "https://api.forexrateapi.com/v1/latest"
     FOREX_HISTORICAL_URL = "https://api.forexrateapi.com/v1"
     FOREX_OHLC_URL = "https://api.forexrateapi.com/v1/ohlc"
@@ -204,12 +206,98 @@ class PriceService:
             print(f"  ⚠️  Forex Rate API error: {str(e)}")
             return None
 
+    def _fetch_metal_historical(self, base: str, quote: str, date: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch historical commodity price from Metal Price API.
+
+        API Format: https://api.metalpriceapi.com/v1/yesterday?api_key=KEY&base=USD&currencies=XAU
+        API Format: https://api.metalpriceapi.com/v1/2025-01-28?api_key=KEY&base=USD&currencies=XAU
+        Response: {"success":true,"base":"USD","timestamp":1762300799,"rates":{"XAU":0.0002502133}}
+        """
+        try:
+            # Build URL with date
+            url = f"{self.METAL_HISTORICAL_URL}/{date}"
+            params = {"api_key": self.metal_api_key, "base": quote, "currencies": base}
+
+            response = requests.get(url, params=params, timeout=5)
+            response.raise_for_status()
+
+            data = response.json()
+
+            if not data.get("success"):
+                print(f"  ⚠️  Metal Historical API error: {data.get('error', 'Unknown error')}")
+                return None
+
+            rates = data.get("rates", {})
+            if base not in rates:
+                return None
+
+            # Invert rate (same logic as latest prices)
+            inverted_rate = rates[base]
+            rate = 1.0 / inverted_rate if inverted_rate > 0 else 0
+
+            return {
+                "pair": f"{base}/{quote}",
+                "rate": round(rate, 2),
+                "date": date,
+                "timestamp": data.get("timestamp"),
+                "source": "metalpriceapi",
+            }
+
+        except Exception as e:
+            print(f"  ⚠️  Metal Historical API error: {str(e)}")
+            return None
+
+    def _fetch_metal_ohlc(self, base: str, quote: str, date: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch OHLC data for commodities from Metal Price API.
+
+        API Format: https://api.metalpriceapi.com/v1/ohlc?api_key=KEY&base=XAU&currency=USD&date=2025-01-28
+        Response: {"success":true,"base":"XAU","quote":"USD","timestamp":1738108799,
+                   "rate":{"close":2742.22,"high":2764.96,"low":2735.11,"open":2741.97}}
+        """
+        try:
+            params = {
+                "api_key": self.metal_api_key,
+                "base": base,
+                "currency": quote,
+                "date": date,
+            }
+
+            response = requests.get(self.METAL_OHLC_URL, params=params, timeout=5)
+            response.raise_for_status()
+
+            data = response.json()
+
+            if not data.get("success"):
+                print(f"  ⚠️  Metal OHLC API error: {data.get('error', 'Unknown error')}")
+                return None
+
+            rate = data.get("rate", {})
+
+            return {
+                "pair": f"{base}/{quote}",
+                "open": round(rate.get("open", 0), 2),
+                "high": round(rate.get("high", 0), 2),
+                "low": round(rate.get("low", 0), 2),
+                "close": round(rate.get("close", 0), 2),
+                "date": date,
+                "timestamp": data.get("timestamp"),
+                "source": "metalpriceapi",
+            }
+
+        except Exception as e:
+            print(f"  ⚠️  Metal OHLC API error: {str(e)}")
+            return None
+
     def get_historical_rates(self, pair: str, date: str = "yesterday") -> Optional[Dict[str, Any]]:
         """
         Get historical exchange rates for a specific date.
 
+        Supports both forex pairs and commodities.
+
         Args:
-            pair: Trading pair (e.g., "EUR/USD")
+            pair: Trading pair (e.g., "EUR/USD", "XAU/USD")
             date: Date string in YYYY-MM-DD format or "yesterday" (default)
 
         Returns:
@@ -219,36 +307,40 @@ class PriceService:
                 "rate": 1.0845,
                 "date": "2025-01-28",
                 "timestamp": 1738108799,
-                "source": "forexrateapi"
+                "source": "forexrateapi" or "metalpriceapi"
             }
         """
         try:
             base, quote = self._parse_pair(pair)
 
-            # Build URL with date
-            url = f"{self.FOREX_HISTORICAL_URL}/{date}"
-            params = {"api_key": self.forex_api_key, "base": base, "currencies": quote}
+            # Route to appropriate API based on asset type
+            if base in self.COMMODITIES:
+                return self._fetch_metal_historical(base, quote, date)
+            else:
+                # Forex API
+                url = f"{self.FOREX_HISTORICAL_URL}/{date}"
+                params = {"api_key": self.forex_api_key, "base": base, "currencies": quote}
 
-            response = requests.get(url, params=params, timeout=5)
-            response.raise_for_status()
+                response = requests.get(url, params=params, timeout=5)
+                response.raise_for_status()
 
-            data = response.json()
+                data = response.json()
 
-            if not data.get("success"):
-                print(f"  ⚠️  Historical API error: {data.get('error', 'Unknown error')}")
-                return None
+                if not data.get("success"):
+                    print(f"  ⚠️  Historical API error: {data.get('error', 'Unknown error')}")
+                    return None
 
-            rates = data.get("rates", {})
-            if quote not in rates:
-                return None
+                rates = data.get("rates", {})
+                if quote not in rates:
+                    return None
 
-            return {
-                "pair": f"{base}/{quote}",
-                "rate": round(rates[quote], 5),
-                "date": date,
-                "timestamp": data.get("timestamp"),
-                "source": "forexrateapi",
-            }
+                return {
+                    "pair": f"{base}/{quote}",
+                    "rate": round(rates[quote], 5),
+                    "date": date,
+                    "timestamp": data.get("timestamp"),
+                    "source": "forexrateapi",
+                }
 
         except Exception as e:
             print(f"  ⚠️  Historical rates error: {str(e)}")
@@ -258,8 +350,10 @@ class PriceService:
         """
         Get OHLC (Open/High/Low/Close) data for a specific date.
 
+        Supports both forex pairs and commodities.
+
         Args:
-            pair: Trading pair (e.g., "EUR/USD")
+            pair: Trading pair (e.g., "EUR/USD", "XAU/USD")
             date: Date string in YYYY-MM-DD format or "yesterday"/"week"/"month"/"year"
 
         Returns:
@@ -272,40 +366,45 @@ class PriceService:
                 "close": 1.0446,
                 "date": "2025-01-28",
                 "timestamp": 1738108799,
-                "source": "forexrateapi"
+                "source": "forexrateapi" or "metalpriceapi"
             }
         """
         try:
             base, quote = self._parse_pair(pair)
 
-            params = {
-                "api_key": self.forex_api_key,
-                "base": base,
-                "currency": quote,
-                "date": date,
-            }
+            # Route to appropriate API based on asset type
+            if base in self.COMMODITIES:
+                return self._fetch_metal_ohlc(base, quote, date)
+            else:
+                # Forex API
+                params = {
+                    "api_key": self.forex_api_key,
+                    "base": base,
+                    "currency": quote,
+                    "date": date,
+                }
 
-            response = requests.get(self.FOREX_OHLC_URL, params=params, timeout=5)
-            response.raise_for_status()
+                response = requests.get(self.FOREX_OHLC_URL, params=params, timeout=5)
+                response.raise_for_status()
 
-            data = response.json()
+                data = response.json()
 
-            if not data.get("success"):
-                print(f"  ⚠️  OHLC API error: {data.get('error', 'Unknown error')}")
-                return None
+                if not data.get("success"):
+                    print(f"  ⚠️  OHLC API error: {data.get('error', 'Unknown error')}")
+                    return None
 
-            rate = data.get("rate", {})
+                rate = data.get("rate", {})
 
-            return {
-                "pair": f"{base}/{quote}",
-                "open": round(rate.get("open", 0), 5),
-                "high": round(rate.get("high", 0), 5),
-                "low": round(rate.get("low", 0), 5),
-                "close": round(rate.get("close", 0), 5),
-                "date": date,
-                "timestamp": data.get("timestamp"),
-                "source": "forexrateapi",
-            }
+                return {
+                    "pair": f"{base}/{quote}",
+                    "open": round(rate.get("open", 0), 5),
+                    "high": round(rate.get("high", 0), 5),
+                    "low": round(rate.get("low", 0), 5),
+                    "close": round(rate.get("close", 0), 5),
+                    "date": date,
+                    "timestamp": data.get("timestamp"),
+                    "source": "forexrateapi",
+                }
 
         except Exception as e:
             print(f"  ⚠️  OHLC error: {str(e)}")
@@ -331,32 +430,30 @@ class PriceService:
         if not current:
             return None
 
-        # Add historical context (only for forex pairs)
+        # Add historical context for both forex and commodities
         base, quote = self._parse_pair(pair)
 
-        # Skip historical data for commodities (not supported by Forex API)
-        if base not in self.COMMODITIES:
-            # Get yesterday's OHLC
-            ohlc = self.get_ohlc(pair, "yesterday")
+        # Get yesterday's OHLC (now supports both forex and commodities)
+        ohlc = self.get_ohlc(pair, "yesterday")
 
-            # Get yesterday's rate
-            historical = self.get_historical_rates(pair, "yesterday")
+        # Get yesterday's rate (now supports both forex and commodities)
+        historical = self.get_historical_rates(pair, "yesterday")
 
-            # Calculate price change
-            price_change = None
-            price_change_pct = None
-            if historical and "rate" in historical:
-                price_change = current["price"] - historical["rate"]
-                price_change_pct = (price_change / historical["rate"]) * 100
+        # Calculate price change
+        price_change = None
+        price_change_pct = None
+        if historical and "rate" in historical:
+            price_change = current["price"] - historical["rate"]
+            price_change_pct = (price_change / historical["rate"]) * 100
 
-            # Enrich current data
-            current["historical"] = {
-                "yesterday_rate": historical["rate"] if historical else None,
-                "price_change": round(price_change, 5) if price_change else None,
-                "price_change_pct": round(price_change_pct, 2) if price_change_pct else None,
-            }
+        # Enrich current data
+        current["historical"] = {
+            "yesterday_rate": historical["rate"] if historical else None,
+            "price_change": round(price_change, 5) if price_change else None,
+            "price_change_pct": round(price_change_pct, 2) if price_change_pct else None,
+        }
 
-            current["ohlc"] = ohlc if ohlc else None
+        current["ohlc"] = ohlc if ohlc else None
 
         return current
 
