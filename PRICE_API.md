@@ -12,6 +12,9 @@ The system now supports **real-time price data** from external APIs:
 ✅ **Price Caching** - 60-second cache to avoid rate limits
 ✅ **Graceful Fallback** - Falls back to mock prices if APIs fail
 ✅ **Multiple Assets** - Supports forex, commodities, and crypto
+✅ **Historical Data** - Access yesterday's rates and historical prices
+✅ **OHLC Data** - Open/High/Low/Close prices for technical analysis
+✅ **Enriched Price Context** - Combines current + historical + OHLC for LLM analysis
 
 ## Setup
 
@@ -63,7 +66,7 @@ Expected output:
 
 ## Usage
 
-### Direct Price Fetching
+### 1. Direct Price Fetching
 
 ```python
 from agents.price_service import get_price_service
@@ -84,19 +87,63 @@ btc = price_service.get_price("BTC/USD")
 print(f"Bitcoin: ${btc['price']}")
 ```
 
-### With Technical Agent
+### 2. Historical Rates (NEW!)
+
+```python
+# Get yesterday's rate
+historical = price_service.get_historical_rates("EUR/USD", "yesterday")
+print(f"Yesterday: ${historical['rate']}")
+
+# Get specific date
+historical = price_service.get_historical_rates("EUR/USD", "2025-01-28")
+print(f"Jan 28: ${historical['rate']}")
+```
+
+### 3. OHLC Data (NEW!)
+
+```python
+# Get yesterday's OHLC
+ohlc = price_service.get_ohlc("EUR/USD", "yesterday")
+print(f"Open:  ${ohlc['open']}")
+print(f"High:  ${ohlc['high']}")
+print(f"Low:   ${ohlc['low']}")
+print(f"Close: ${ohlc['close']}")
+
+# Calculate trading range
+range_pct = ((ohlc['high'] - ohlc['low']) / ohlc['low']) * 100
+print(f"Range: {range_pct:.2f}%")
+```
+
+### 4. Enriched Price Data (NEW!)
+
+```python
+# Get current price + historical + OHLC in one call
+enriched = price_service.get_enriched_price("EUR/USD")
+
+print(f"Current: ${enriched['price']}")
+print(f"24h Change: {enriched['historical']['price_change_pct']}%")
+print(f"Yesterday's Close: ${enriched['ohlc']['close']}")
+```
+
+### 5. With Technical Agent (Enhanced!)
 
 ```python
 from agents.technical_agent import TechnicalAgent
+import asyncio
 
-# Enable real prices
-agent = TechnicalAgent(use_real_prices=True)
+# Enable real prices and LLM analysis
+agent = TechnicalAgent(use_real_prices=True, use_llm=True)
 
-# Analyze with real data
-result = agent.analyze("XAU/USD")
+# Analyze with real data + historical context
+result = asyncio.run(agent.analyze("XAU/USD"))
 
 print(f"Price: ${result['data']['current_price']}")
 print(f"Source: {result['data']['price_source']}")  # "real" or "mock"
+print(f"Trend: {result['data']['trend']}")
+print(f"Signal: {result['data']['signals']['overall']}")
+
+# Historical context is now automatically included in LLM prompt!
+# The agent receives current price, 24h change, and OHLC data
 ```
 
 ### With Full System
