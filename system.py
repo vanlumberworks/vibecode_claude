@@ -71,17 +71,26 @@ class ForexAgentSystem:
         print(f"   Account Balance: ${os.getenv('ACCOUNT_BALANCE')}")
         print(f"   Max Risk Per Trade: {float(os.getenv('MAX_RISK_PER_TRADE'))*100}%")
 
-    def analyze(self, pair: str, verbose: bool = True) -> Dict[str, Any]:
+    def analyze(self, query: str, verbose: bool = True) -> Dict[str, Any]:
         """
-        Analyze a currency pair and make a trading decision.
+        Analyze a trading query and make a decision.
+
+        NEW: Now accepts natural language queries!
+        - "Analyze gold trading"
+        - "Should I buy EUR/USD?"
+        - "What about Bitcoin?"
+        - "EUR/USD" (still works)
 
         This method:
-        1. Runs all analysis agents (news, technical, fundamental, risk)
-        2. Synthesizes results using Gemini + Google Search
-        3. Returns a trading decision with citations
+        1. Parses natural language query into structured context
+        2. Runs analysis agents in parallel (News, Technical, Fundamental)
+        3. Validates risk parameters
+        4. Synthesizes results using Gemini + Google Search
+        5. Returns a trading decision with citations
 
         Args:
-            pair: Currency pair to analyze (e.g., "EUR/USD")
+            query: Natural language query or currency pair
+                   Examples: "Analyze gold", "EUR/USD", "Should I buy Bitcoin?"
             verbose: Print progress messages (default: True)
 
         Returns:
@@ -89,17 +98,20 @@ class ForexAgentSystem:
 
         Example:
             >>> system = ForexAgentSystem()
-            >>> result = system.analyze("EUR/USD")
+            >>> result = system.analyze("Analyze gold trading")
             >>> print(result["decision"]["action"])  # BUY, SELL, or WAIT
+            >>> print(result["query_context"]["pair"])  # XAU/USD
         """
         if verbose:
             print(f"\n{'='*60}")
-            print(f"🔍 ANALYZING: {pair}")
+            print(f"🔍 QUERY: {query}")
             print(f"{'='*60}\n")
 
-        # Prepare initial state
+        # Prepare initial state with natural language query
         inputs = {
-            "pair": pair,
+            "user_query": query,
+            "query_context": None,
+            "pair": None,  # Will be set by query parser
             "messages": [],
             "step_count": 0,
             "news_result": None,
@@ -170,6 +182,8 @@ class ForexAgentSystem:
                 }
 
         return {
+            "user_query": state.get("user_query"),
+            "query_context": state.get("query_context"),
             "pair": state.get("pair"),
             "decision": decision,
             "agent_results": {

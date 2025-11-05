@@ -5,31 +5,37 @@ from system import ForexAgentSystem
 
 
 def main():
-    """Run forex analysis on a currency pair."""
-    # Default pair
-    pair = "EUR/USD"
+    """Run forex analysis with natural language query."""
+    # Default query
+    query = "EUR/USD"
 
-    # Check if pair provided as command line argument
+    # Check if query provided as command line argument
     if len(sys.argv) > 1:
-        pair = sys.argv[1].upper()
-        # Ensure proper format
-        if "/" not in pair:
-            print(f"❌ Invalid pair format: {pair}")
-            print("   Use format: EUR/USD or EURUSD")
-            sys.exit(1)
+        # Join all arguments to support multi-word queries
+        query = " ".join(sys.argv[1:])
 
     try:
         # Initialize system
-        print("🚀 Initializing Forex Agent System...")
+        print("🚀 Initializing Forex Agent System (v2 - Natural Language)...")
         system = ForexAgentSystem()
 
-        # Run analysis
-        result = system.analyze(pair)
+        # Run analysis with natural language
+        result = system.analyze(query)
 
         # Print detailed results
         print("\n" + "=" * 60)
         print("📊 DETAILED RESULTS")
         print("=" * 60)
+
+        # Query context
+        query_ctx = result.get("query_context", {})
+        if query_ctx:
+            print(f"\n🔍 Query Understanding:")
+            print(f"   Original: '{result['user_query']}'")
+            print(f"   Parsed Pair: {query_ctx.get('pair', 'N/A')}")
+            print(f"   Asset Type: {query_ctx.get('asset_type', 'N/A')}")
+            print(f"   Timeframe: {query_ctx.get('timeframe', 'N/A')}")
+            print(f"   Intent: {query_ctx.get('user_intent', 'N/A')}")
 
         # Agent summaries
         print("\n📰 News Agent:")
@@ -62,6 +68,10 @@ def main():
 
         print("\n" + "=" * 60)
         print("✅ Analysis complete!")
+        print("\n💡 Try these queries:")
+        print("   python main.py 'Analyze gold trading'")
+        print("   python main.py 'Should I buy Bitcoin?'")
+        print("   python main.py 'GBP/USD long term outlook'")
 
     except ValueError as e:
         print(f"\n❌ Configuration Error: {e}")
