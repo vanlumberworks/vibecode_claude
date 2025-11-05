@@ -9,26 +9,30 @@ class TechnicalAgent:
     """
     Performs technical analysis on currency pairs.
 
-    In production, this would use real price data and calculate actual indicators.
-    For now, it provides realistic mock technical data.
+    Now integrated with real-time price APIs:
+    - Metal Price API for commodities (XAU, XAG, etc.)
+    - Forex Rate API for forex and crypto pairs
+
+    Falls back to mock data if API fails.
     """
 
-    def __init__(self):
+    def __init__(self, use_real_prices: bool = True):
         self.name = "TechnicalAgent"
+        self.use_real_prices = use_real_prices
 
     def analyze(self, pair: str) -> Dict[str, Any]:
         """
         Perform technical analysis for the given currency pair.
 
         Args:
-            pair: Currency pair (e.g., "EUR/USD")
+            pair: Currency pair (e.g., "EUR/USD", "XAU/USD", "BTC/USD")
 
         Returns:
             Dict with technical analysis results
         """
         try:
-            # Generate mock price data
-            current_price = self._get_mock_price(pair)
+            # Get current price (real or mock)
+            current_price, price_source = self._get_price(pair)
 
             # Calculate indicators (mock values)
             indicators = self._calculate_indicators(current_price)
@@ -48,6 +52,7 @@ class TechnicalAgent:
                 "data": {
                     "pair": pair,
                     "current_price": current_price,
+                    "price_source": price_source,  # "real" or "mock"
                     "indicators": indicators,
                     "trend": trend,
                     "support": support,
@@ -67,6 +72,30 @@ class TechnicalAgent:
                 "error": str(e),
                 "data": {},
             }
+
+    def _get_price(self, pair: str) -> tuple:
+        """
+        Get current price for the pair.
+
+        Returns:
+            (price: float, source: str)
+        """
+        if self.use_real_prices:
+            # Try to get real price
+            from agents.price_service import get_price_service
+
+            price_service = get_price_service()
+            price_data = price_service.get_price(pair)
+
+            if price_data:
+                print(f"     💰 Real price: ${price_data['price']} from {price_data['source']}")
+                return price_data["price"], "real"
+            else:
+                print(f"     ⚠️  Failed to get real price, using mock data")
+
+        # Fallback to mock price
+        mock_price = self._get_mock_price(pair)
+        return mock_price, "mock"
 
     def _get_mock_price(self, pair: str) -> float:
         """Get mock current price based on pair."""
