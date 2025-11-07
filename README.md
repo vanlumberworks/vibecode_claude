@@ -11,6 +11,7 @@ A production-ready multi-agent forex trading analysis system using **LangGraph**
   - ⚖️ **Risk Agent**: Calculates position sizing and validates trades
   - 🤖 **Synthesis Agent**: Uses Gemini + Google Search for final decision
 
+- **Real-Time Streaming API**: FastAPI + SSE for live progress updates
 - **LangGraph Orchestration**: Stateful, intelligent workflow with conditional routing
 - **Real-Time Data**: Google Search grounding for up-to-date market information
 - **Source Citations**: Every decision includes web sources
@@ -91,6 +92,84 @@ python main.py EUR/USD
 python main.py
 ```
 
+## 🌐 Streaming API
+
+The system includes a **real-time streaming API** that provides live updates as the analysis progresses. Perfect for building interactive frontends!
+
+### Start the API Server
+
+```bash
+# Option 1: Run directly
+python backend/server.py
+
+# Option 2: Use uvicorn
+uvicorn backend.server:app --reload
+
+# Server runs on http://localhost:8000
+```
+
+### Test the Streaming API
+
+```bash
+# Terminal 1: Start the server
+python backend/server.py
+
+# Terminal 2: Run the example client
+python examples/streaming_client.py "Analyze gold trading"
+
+# Or run comprehensive tests
+python test_streaming_api.py
+```
+
+### API Endpoints
+
+- **GET /health** - Health check
+- **GET /info** - System information
+- **POST /analyze** - Non-streaming analysis
+- **POST /analyze/stream** - Real-time streaming (SSE)
+- **GET /analyze/stream?query=...** - Streaming with GET
+
+### Stream Events
+
+The API emits these event types:
+
+1. **start** - Analysis initiated
+2. **query_parsed** - Query parsed into structured context
+3. **agent_update** - Each agent completes (news, technical, fundamental)
+4. **risk_update** - Risk assessment result
+5. **decision** - Final trading decision
+6. **complete** - Full analysis result
+7. **error** - Error occurred
+
+### Quick Example (Python)
+
+```python
+from sseclient import SSEClient
+import json
+
+url = "http://localhost:8000/analyze/stream?query=Analyze gold"
+for msg in SSEClient(url):
+    if msg.event == "decision":
+        data = json.loads(msg.data)
+        print(f"Action: {data['decision']['action']}")
+        print(f"Confidence: {data['decision']['confidence']}")
+```
+
+### Quick Example (JavaScript)
+
+```javascript
+const url = "http://localhost:8000/analyze/stream?query=Analyze gold";
+const eventSource = new EventSource(url);
+
+eventSource.addEventListener('decision', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Action:', data.decision.action);
+  console.log('Confidence:', data.decision.confidence);
+});
+```
+
+📖 **Full documentation**: See [docs/STREAMING_API.md](docs/STREAMING_API.md)
+
 ## 💻 Usage Examples
 
 ### Basic Analysis
@@ -161,34 +240,59 @@ for source in sources:
 
 ```
 vibecode_claude/
-├── agents/                  # Individual agent implementations
-│   ├── news_agent.py       # News and sentiment analysis
-│   ├── technical_agent.py  # Technical indicators
-│   ├── fundamental_agent.py # Economic fundamentals
-│   └── risk_agent.py       # Position sizing and risk
+├── agents/                     # Individual agent implementations
+│   ├── news_agent.py          # News and sentiment analysis
+│   ├── technical_agent.py     # Technical indicators
+│   ├── fundamental_agent.py   # Economic fundamentals
+│   ├── risk_agent.py          # Position sizing and risk
+│   └── price_service.py       # Real-time price data
 │
-├── graph/                   # LangGraph components
-│   ├── state.py            # State definition
-│   ├── nodes.py            # Node functions
-│   └── workflow.py         # Workflow builder
+├── graph/                      # LangGraph components
+│   ├── state.py               # State definition
+│   ├── nodes.py               # Node functions
+│   ├── query_parser.py        # Natural language parser
+│   ├── parallel_nodes.py      # Parallel agent execution
+│   └── workflow.py            # Workflow builder
 │
-├── examples/                # Usage examples
-│   └── basic_usage.py      # Example scripts
+├── backend/                    # FastAPI streaming API
+│   ├── server.py              # API server with SSE
+│   ├── streaming_adapter.py   # Streaming wrapper
+│   └── __init__.py
 │
-├── system.py               # Main ForexAgentSystem class
-├── main.py                 # CLI entry point
-├── requirements.txt        # Dependencies
-├── .env.example           # Environment template
-└── README.md              # This file
+├── examples/                   # Usage examples
+│   ├── basic_usage.py         # Basic system usage
+│   ├── natural_language.py    # Natural language queries
+│   ├── real_prices.py         # Real price integration
+│   └── streaming_client.py    # Streaming API client
+│
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md        # System architecture
+│   ├── STREAMING_API.md       # Streaming API docs
+│   └── ...
+│
+├── system.py                  # Main ForexAgentSystem class
+├── main.py                    # CLI entry point
+├── test_streaming_api.py      # API tests
+├── requirements.txt           # Dependencies
+├── .env.example              # Environment template
+└── README.md                 # This file
 ```
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-- `GOOGLE_AI_API_KEY` (required): Your Google AI API key
-- `ACCOUNT_BALANCE` (optional): Trading account balance (default: 10000.0)
-- `MAX_RISK_PER_TRADE` (optional): Max risk per trade as decimal (default: 0.02 = 2%)
+**Required:**
+- `GOOGLE_AI_API_KEY`: Your Google AI API key
+
+**Optional (Trading):**
+- `ACCOUNT_BALANCE`: Trading account balance (default: 10000.0)
+- `MAX_RISK_PER_TRADE`: Max risk per trade as decimal (default: 0.02 = 2%)
+
+**Optional (API Server):**
+- `API_HOST`: Server host (default: 0.0.0.0)
+- `API_PORT`: Server port (default: 8000)
+- `API_RELOAD`: Auto-reload on changes (default: true)
 
 ### System Parameters
 
