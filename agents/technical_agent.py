@@ -28,29 +28,68 @@ class TechnicalAgent:
         self.use_real_prices = use_real_prices
         self.use_llm = use_llm
 
-    async def analyze(self, pair: str) -> Dict[str, Any]:
+    async def analyze(self, pair: str, config: dict = None) -> Dict[str, Any]:
         """
         Perform technical analysis with LLM reasoning.
 
         Args:
             pair: Currency pair (e.g., "EUR/USD", "XAU/USD", "BTC/USD")
+            config: Optional runtime configuration for streaming
 
         Returns:
             Dict with structured technical analysis results
         """
+        from langgraph.config import get_stream_writer
+        import time
+
+        start_time = time.time()
+
         try:
+            # Get stream writer for progress updates
+            writer = get_stream_writer()
+
+            # Emit progress: Starting (10% progress)
+            writer({"agent_progress": {
+                "agent": "technical",
+                "step": "fetching_price",
+                "message": f"Fetching real-time price for {pair}",
+                "progress_percentage": 10,
+                "execution_start_time": datetime.utcnow().isoformat() + "Z"
+            }})
+
             # Get current price with historical context
             price_data, price_source = self._get_price(pair)
+
+            # Emit progress: Price fetched (30% progress)
+            current_price = price_data["price"] if isinstance(price_data, dict) else price_data
+            writer({"agent_progress": {
+                "agent": "technical",
+                "step": "price_fetched",
+                "message": f"Price fetched: ${current_price}",
+                "progress_percentage": 30,
+                "intermediate_data": {
+                    "current_price": current_price,
+                    "price_source": price_source
+                }
+            }})
 
             # Extract current price
             current_price = price_data["price"] if isinstance(price_data, dict) else price_data
 
             if self.use_llm:
+                # Emit progress: Starting LLM analysis (50% progress)
+                writer({"agent_progress": {
+                    "agent": "technical",
+                    "step": "llm_analysis",
+                    "message": "Analyzing technical patterns with Gemini LLM",
+                    "progress_percentage": 50
+                }})
+
                 # Use Gemini for intelligent analysis
-                return await self._analyze_with_llm(pair, price_data, price_source)
+                return await self._analyze_with_llm(pair, price_data, price_source, writer, start_time)
             else:
                 # Fallback to rule-based analysis
-                return self._analyze_rule_based(pair, current_price, price_source)
+                return self._analyze_rule_based(pair, current_price, price_source, writer, start_time)
 
         except Exception as e:
             print(f"  ⚠️  Technical Agent error: {str(e)}")
@@ -61,10 +100,11 @@ class TechnicalAgent:
                 "data": {},
             }
 
-    async def _analyze_with_llm(self, pair: str, price_data: Dict[str, Any], price_source: str) -> Dict[str, Any]:
+    async def _analyze_with_llm(self, pair: str, price_data: Dict[str, Any], price_source: str, writer, start_time: float) -> Dict[str, Any]:
         """Use Gemini LLM for intelligent technical analysis."""
         from google import genai
         from google.genai import types
+        import time
 
         # Get API key
         api_key = os.getenv("GOOGLE_AI_API_KEY")
@@ -88,12 +128,18 @@ class TechnicalAgent:
             grounding_tool = types.Tool(google_search=types.GoogleSearch())
             tools.append(grounding_tool)
 
-        config = types.GenerateContentConfig(
-            temperature=0.3,
-            response_mime_type="application/json",
-            tools=tools if tools else None,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-        )
+        # NOTE: Cannot use response_mime_type with tools
+        config_params = {
+            "temperature": 0.3,
+            "thinking_config": types.ThinkingConfig(thinking_budget=0),
+        }
+
+        if tools:
+            config_params["tools"] = tools
+        else:
+            config_params["response_mime_type"] = "application/json"
+
+        config = types.GenerateContentConfig(**config_params)
 
         # Generate analysis
         response = client.models.generate_content(
@@ -102,10 +148,7 @@ class TechnicalAgent:
             config=config
         )
 
-        # Parse response
-        analysis = json.loads(response.text)
-
-        # Extract grounding if available
+        # Extract grounding if available (70% progress)
         sources = []
         search_queries = []
         if response.candidates[0].grounding_metadata:
@@ -113,6 +156,83 @@ class TechnicalAgent:
             search_queries = metadata.web_search_queries or []
             if metadata.grounding_chunks:
                 sources = [{"title": c.web.title, "url": c.web.uri} for c in metadata.grounding_chunks]
+
+            # Emit web_search event
+            writer({"web_search": {
+                "agent": "technical",
+                "queries": search_queries,
+                "sources": sources,
+                "source_count": len(sources)
+            }})
+            writer({"agent_progress": {
+                "agent": "technical",
+                "step": "search_complete",
+                "message": f"Found {len(sources)} technical analysis sources",
+                "progress_percentage": 70
+            }})
+
+        # Parse response (extract JSON from potential markdown code blocks)
+        writer({"agent_progress": {
+            "agent": "technical",
+            "step": "parsing_analysis",
+            "message": "Processing technical indicators",
+            "progress_percentage": 80
+        }})
+
+        response_text = response.text.strip()
+
+        # Remove markdown code blocks if present
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+
+        response_text = response_text.strip()
+
+        # Try to parse JSON with error handling
+        try:
+            if not response_text:
+                raise ValueError("Empty response from Gemini")
+            analysis = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            # If JSON parsing fails, fall back to rule-based analysis
+            print(f"     ⚠️  Failed to parse LLM response as JSON: {str(e)}")
+            print(f"     ⚠️  Response text: {response_text[:200]}")
+            print(f"     ⚠️  Falling back to rule-based analysis")
+            return self._analyze_rule_based(pair, current_price, price_source, writer, start_time)
+
+        # Emit intermediate data (90% progress)
+        trend = analysis.get("trend", "unknown")
+        trend_strength = analysis.get("trend_strength", "medium")
+        writer({"agent_progress": {
+            "agent": "technical",
+            "step": "analysis_complete",
+            "message": f"Trend: {trend} ({trend_strength})",
+            "progress_percentage": 90,
+            "intermediate_data": {
+                "trend": trend,
+                "trend_strength": trend_strength,
+                "support": analysis.get("support"),
+                "resistance": analysis.get("resistance"),
+                "indicators": analysis.get("indicators", {})
+            }
+        }})
+
+        elapsed = time.time() - start_time
+        execution_end_time = datetime.utcnow().isoformat() + "Z"
+
+        # Emit completion (100% progress)
+        writer({"agent_progress": {
+            "agent": "technical",
+            "step": "complete",
+            "message": f"Technical analysis complete in {elapsed:.2f}s",
+            "progress_percentage": 100,
+            "execution_end_time": execution_end_time,
+            "execution_time": elapsed
+        }})
 
         # Build structured result
         return {
@@ -123,8 +243,8 @@ class TechnicalAgent:
                 "current_price": current_price,
                 "price_source": price_source,
                 # Technical analysis from LLM
-                "trend": analysis.get("trend", "unknown"),
-                "trend_strength": analysis.get("trend_strength", "medium"),
+                "trend": trend,
+                "trend_strength": trend_strength,
                 "support": analysis.get("support"),
                 "resistance": analysis.get("resistance"),
                 "indicators": analysis.get("indicators", {}),
@@ -141,14 +261,26 @@ class TechnicalAgent:
                 "data_source": "llm_analysis",
                 "search_queries": search_queries,
                 "sources": sources,
+                # Execution timing
+                "execution_time": elapsed,
+                "execution_start_time": start_time,
+                "execution_end_time": execution_end_time
             },
         }
 
-    def _analyze_rule_based(self, pair: str, current_price: float, price_source: str) -> Dict[str, Any]:
+    def _analyze_rule_based(self, pair: str, current_price: float, price_source: str, writer, start_time: float) -> Dict[str, Any]:
         """Fallback rule-based analysis (original logic)."""
         import random
+        import time
 
-        # Simple rule-based indicators
+        # Simple rule-based indicators (70% progress)
+        writer({"agent_progress": {
+            "agent": "technical",
+            "step": "rule_based_analysis",
+            "message": "Calculating technical indicators",
+            "progress_percentage": 70
+        }})
+
         indicators = {
             "rsi": round(random.uniform(30, 70), 2),
             "macd": round(random.uniform(-0.01, 0.01), 4),
@@ -170,6 +302,33 @@ class TechnicalAgent:
             "overall": "BUY" if indicators["rsi"] < 40 else "SELL" if indicators["rsi"] > 60 else "HOLD",
         }
 
+        # Emit intermediate data (90% progress)
+        writer({"agent_progress": {
+            "agent": "technical",
+            "step": "analysis_complete",
+            "message": f"Trend: {trend}",
+            "progress_percentage": 90,
+            "intermediate_data": {
+                "trend": trend,
+                "support": support,
+                "resistance": resistance,
+                "indicators": indicators
+            }
+        }})
+
+        elapsed = time.time() - start_time
+        execution_end_time = datetime.utcnow().isoformat() + "Z"
+
+        # Emit completion (100% progress)
+        writer({"agent_progress": {
+            "agent": "technical",
+            "step": "complete",
+            "message": f"Rule-based analysis complete in {elapsed:.2f}s",
+            "progress_percentage": 100,
+            "execution_end_time": execution_end_time,
+            "execution_time": elapsed
+        }})
+
         return {
             "success": True,
             "agent": self.name,
@@ -187,6 +346,10 @@ class TechnicalAgent:
                 "analysis_timestamp": datetime.utcnow().isoformat(),
                 "summary": f"Technical analysis shows {trend} with {signals['overall']} signal.",
                 "data_source": "rule_based",
+                # Execution timing
+                "execution_time": elapsed,
+                "execution_start_time": start_time,
+                "execution_end_time": execution_end_time
             },
         }
 

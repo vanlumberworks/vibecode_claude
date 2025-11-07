@@ -114,6 +114,8 @@ class StreamingForexSystem:
                             event_type = "agent_start"
                         elif "agent_progress" in data:
                             event_type = "agent_progress"
+                        elif "web_search" in data:
+                            event_type = "web_search"
 
                         if event_type:
                             yield {

@@ -2,10 +2,14 @@
 
 import json
 import os
+import time
 from typing import Dict, Any
 from langchain_core.runnables import RunnableConfig
 
 from graph.state import ForexAgentState
+from utils.logger import get_logger, log_error
+
+logger = get_logger(__name__)
 
 
 def query_parser_node(state: ForexAgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -32,10 +36,17 @@ def query_parser_node(state: ForexAgentState, config: RunnableConfig) -> Dict[st
     Returns:
         State updates with query_context
     """
+    from langgraph.config import get_stream_writer
+
     user_query = state.get("user_query", "")
-    print(f"🔍 Query Parser analyzing: '{user_query}'")
+    logger.info(f"🔍 [QUERY PARSER] Starting analysis of query: '{user_query}'")
+    start_time = time.time()
 
     try:
+        # Get stream writer for progress updates
+        writer = get_stream_writer()
+        writer({"agent_progress": {"agent": "query_parser", "step": "parsing", "message": f"Parsing query: '{user_query}'"}})
+
         from google import genai
         from google.genai import types
 
@@ -68,9 +79,12 @@ def query_parser_node(state: ForexAgentState, config: RunnableConfig) -> Dict[st
         # Set backwards-compatible pair field
         pair = query_context.get("pair", "EUR/USD")
 
-        print(f"  ✅ Parsed as: {pair} ({query_context.get('asset_type', 'unknown')})")
-        print(f"     Timeframe: {query_context.get('timeframe', 'unknown')}")
-        print(f"     Intent: {query_context.get('user_intent', 'unknown')}")
+        elapsed = time.time() - start_time
+        logger.info(f"✅ [QUERY PARSER] Successfully parsed in {elapsed:.2f}s:")
+        logger.info(f"   Pair: {pair} ({query_context.get('asset_type', 'unknown')})")
+        logger.info(f"   Timeframe: {query_context.get('timeframe', 'unknown')}")
+        logger.info(f"   Intent: {query_context.get('user_intent', 'unknown')}")
+        logger.debug(f"   Full context: {query_context}")
 
         return {
             "query_context": query_context,
@@ -79,10 +93,13 @@ def query_parser_node(state: ForexAgentState, config: RunnableConfig) -> Dict[st
         }
 
     except Exception as e:
-        print(f"  ❌ Query parsing failed: {str(e)}")
+        elapsed = time.time() - start_time
+        log_error(logger, e, "query_parser_node")
+        logger.error(f"❌ [QUERY PARSER] Parsing failed after {elapsed:.2f}s")
 
         # Fallback: try to extract pair from query
         fallback_pair = _fallback_parse(user_query)
+        logger.warning(f"⚠️  [QUERY PARSER] Using fallback pair: {fallback_pair}")
 
         return {
             "query_context": {
@@ -92,7 +109,7 @@ def query_parser_node(state: ForexAgentState, config: RunnableConfig) -> Dict[st
             },
             "pair": fallback_pair,
             "step_count": state.get("step_count", 0) + 1,
-            "errors": {**state.get("errors", {}), "query_parser": str(e)},
+            "errors": {**(state.get("errors") or {}), "query_parser": str(e)},
         }
 
 

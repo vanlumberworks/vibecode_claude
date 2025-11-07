@@ -119,6 +119,7 @@ class ForexAgentSystem:
             "fundamental_result": None,
             "risk_result": None,
             "decision": None,
+            "report_result": None,
             "should_continue": True,
             "errors": None,
         }
@@ -186,6 +187,7 @@ class ForexAgentSystem:
             "query_context": state.get("query_context"),
             "pair": state.get("pair"),
             "decision": decision,
+            "report": state.get("report_result"),
             "agent_results": {
                 "news": state.get("news_result"),
                 "technical": state.get("technical_result"),

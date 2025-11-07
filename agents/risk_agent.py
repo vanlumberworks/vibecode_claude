@@ -164,13 +164,10 @@ class RiskAgent:
         # Build risk analysis prompt
         prompt = self._build_risk_prompt(pair, risk_calc, market_context)
 
-        # Configure Gemini with optional Google Search
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
-
+        # Configure Gemini without Google Search (to avoid API conflicts with JSON response)
         config = types.GenerateContentConfig(
             temperature=0.3,
             response_mime_type="application/json",
-            tools=[grounding_tool],
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
@@ -185,15 +182,6 @@ class RiskAgent:
             # Parse LLM analysis
             llm_analysis = json.loads(response.text)
 
-            # Extract grounding if available
-            sources = []
-            search_queries = []
-            if response.candidates[0].grounding_metadata:
-                metadata = response.candidates[0].grounding_metadata
-                search_queries = metadata.web_search_queries or []
-                if metadata.grounding_chunks:
-                    sources = [{"title": c.web.title, "url": c.web.uri} for c in metadata.grounding_chunks]
-
             # Merge rule-based calculations with LLM insights
             risk_data = risk_calc["data"]
             risk_data.update({
@@ -201,7 +189,7 @@ class RiskAgent:
                 "risk_factors": llm_analysis.get("risk_factors", []),
                 "market_volatility": llm_analysis.get("market_volatility", "unknown"),
                 "volatility_assessment": llm_analysis.get("volatility_assessment", ""),
-                "recommended_action": llm_analysis.get("recommended_action", risk_data.get("trade_approved", False)),
+                "recommended_action": llm_analysis.get("recommended_action", risk_data.get("trade_approved", True)),
                 "confidence_score": llm_analysis.get("confidence_score", 0.5),
                 "risk_warnings": llm_analysis.get("risk_warnings", []),
                 "optimal_position_size": llm_analysis.get("optimal_position_size", risk_data["position_size"]),
@@ -211,8 +199,6 @@ class RiskAgent:
                 "reasoning": llm_analysis.get("reasoning", ""),
                 # Metadata
                 "data_source": "llm_enhanced",
-                "search_queries": search_queries,
-                "sources": sources,
             })
 
             return {
@@ -266,36 +252,47 @@ class RiskAgent:
 
     def _validate_trade(self, risk_in_pips: float, risk_reward_ratio: float = None) -> tuple:
         """
-        Validate if trade meets risk management criteria.
+        Validate if trade meets risk management criteria (ADVISORY ONLY).
 
         Returns:
             (approved: bool, reason: str or None)
+
+        Note: These validations are for informational purposes. They provide guidance
+        but won't block the final trading decision.
         """
-        # Rule 1: Risk must be positive
+        warnings = []
+
+        # Advisory Check 1: Risk should be positive
         if risk_in_pips <= 0:
-            return False, "Invalid stop loss: risk in pips must be positive"
+            warnings.append(f"Invalid stop loss: risk in pips must be positive (got {risk_in_pips:.1f})")
 
-        # Rule 2: Risk must not be too large (e.g., max 100 pips)
-        if risk_in_pips > 100:
-            return False, f"Risk too high: {risk_in_pips:.1f} pips exceeds maximum of 100 pips"
+        # Advisory Check 2: Note if risk is unusually large (informational only)
+        if risk_in_pips > 1000:
+            warnings.append(f"Unusually large risk: {risk_in_pips:.1f} pips. This might indicate a data issue or commodity pricing.")
 
-        # Rule 3: Risk/Reward ratio must be at least 1.5:1 if provided
+        # Advisory Check 3: Risk/Reward ratio guidance
         if risk_reward_ratio is not None:
             if risk_reward_ratio < 1.5:
-                return False, f"Poor risk/reward ratio: {risk_reward_ratio:.2f} is below minimum of 1.5"
+                warnings.append(f"Risk/reward ratio of {risk_reward_ratio:.2f} is below the recommended 1.5:1 minimum")
 
-        # Rule 4: Risk must not be too small (e.g., min 10 pips)
-        if risk_in_pips < 10:
-            return False, f"Risk too small: {risk_in_pips:.1f} pips is below minimum of 10 pips"
+        # Advisory Check 4: Note if risk is unusually small
+        if 0 < risk_in_pips < 10:
+            warnings.append(f"Risk of {risk_in_pips:.1f} pips is quite small. Ensure stop loss is intentional.")
+
+        # Always approve (advisory only), but provide warnings
+        if warnings:
+            return True, " | ".join(warnings)
 
         return True, None
 
     def _generate_summary(self, approved: bool, position_size: float, dollar_risk: float, reason: str = None) -> str:
         """Generate risk analysis summary."""
-        if not approved:
-            return f"Trade REJECTED: {reason}"
+        base_summary = f"Position size {position_size:.2f} lots, risking ${dollar_risk:.2f} ({self.max_risk_per_trade*100:.1f}% of account)"
 
-        return f"Trade APPROVED: Position size {position_size:.2f} lots, risking ${dollar_risk:.2f} ({self.max_risk_per_trade*100:.1f}% of account)."
+        if reason:
+            return f"{base_summary}. ⚠️ Advisory warnings: {reason}"
+
+        return f"{base_summary}. No risk warnings detected."
 
     def _build_risk_prompt(self, pair: str, risk_calc: Dict[str, Any], market_context: Dict[str, Any]) -> str:
         """Build the risk analysis prompt for Gemini."""
@@ -348,12 +345,12 @@ ACCOUNT PARAMETERS:
 
 ANALYSIS REQUIREMENTS:
 
-1. **Risk Factors Analysis** (Use Google Search for current market conditions)
+1. **Risk Factors Analysis** (Based on provided market context)
    Identify 3-5 key risk factors affecting this trade:
-   - Market volatility (current ATR, recent price swings)
-   - Economic events scheduled (rate decisions, data releases)
-   - Geopolitical factors
-   - Liquidity conditions
+   - Market volatility (estimate based on price levels and pair type)
+   - Economic events considerations (use general market knowledge)
+   - Geopolitical factors (general awareness)
+   - Liquidity conditions (typical for this pair)
    - Correlation risks
    - Technical support/resistance levels near stop loss
 
@@ -431,11 +428,12 @@ OUTPUT FORMAT (JSON):
 }}
 
 CRITICAL:
-- Use REAL market data from Google Search for volatility and event calendar
+- Use provided market context and your knowledge to assess risk
 - Be objective and data-driven - prioritize capital preservation
 - If conflicting signals exist, recommend caution
 - Consider the trader's account size and risk tolerance
-- Recent market volatility trumps historical patterns
+- Market volatility considerations trump historical patterns
+- Remember: This is ADVISORY only - provide guidance but don't block trades
 
 Analyze now: {pair} {risk_data['direction']} trade with {risk_data['position_size']} lots risking ${risk_data['dollar_risk']}
 """

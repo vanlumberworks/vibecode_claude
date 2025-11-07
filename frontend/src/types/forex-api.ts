@@ -15,14 +15,18 @@ export type ActionType = 'BUY' | 'SELL' | 'WAIT';
 
 export type AssetType = 'forex' | 'commodity' | 'crypto';
 
-export type AgentName = 'news' | 'technical' | 'fundamental';
+export type AgentName = 'news' | 'technical' | 'fundamental' | 'report';
 
 export type EventType =
   | 'start'
   | 'query_parsed'
+  | 'agent_start'
+  | 'agent_progress'
   | 'agent_update'
+  | 'web_search'
   | 'risk_update'
   | 'decision'
+  | 'report_update'
   | 'complete'
   | 'error';
 
@@ -114,6 +118,22 @@ export interface RiskData {
   analysis: string;
 }
 
+export interface ReportMetadata {
+  generated_at: string;
+  pair: string;
+  action: ActionType;
+  sections: string[];
+  word_count: number;
+}
+
+export interface ReportData {
+  success: boolean;
+  agent: string;
+  html: string;
+  metadata: ReportMetadata;
+  error?: string;
+}
+
 // ============================================================================
 // Decision & Trade Parameters
 // ============================================================================
@@ -174,6 +194,7 @@ export interface AnalysisResult {
   query_context: QueryContext | null;
   pair: string | null;
   decision: Decision | null;
+  report: ReportData | null;
   agent_results: AgentResults;
   metadata: AnalysisMetadata;
 }
@@ -214,6 +235,12 @@ export interface DecisionEventData {
   timestamp: string;
 }
 
+export interface ReportUpdateEventData {
+  step: number;
+  report_result: ReportData;
+  timestamp: string;
+}
+
 export interface CompleteEventData {
   result: AnalysisResult;
   timestamp: string;
@@ -225,6 +252,40 @@ export interface ErrorEventData {
   timestamp: string;
 }
 
+export interface AgentStartEventData {
+  agent_start: {
+    agent: AgentName;
+    pair: string;
+    status: string;
+  };
+}
+
+export interface AgentProgressEventData {
+  agent_progress: {
+    agent: AgentName | 'query_parser';
+    step: string;
+    message: string;
+    progress_percentage?: number;
+    intermediate_data?: any;
+    execution_start_time?: string;
+    execution_end_time?: string;
+    execution_time?: number;
+    data?: any;
+  };
+}
+
+export interface WebSearchEventData {
+  web_search: {
+    agent: AgentName;
+    queries: string[];
+    sources: Array<{
+      title: string;
+      url: string;
+    }>;
+    source_count: number;
+  };
+}
+
 // ============================================================================
 // SSE Event Union Type
 // ============================================================================
@@ -232,9 +293,13 @@ export interface ErrorEventData {
 export type StreamEventData =
   | StartEventData
   | QueryParsedEventData
+  | AgentStartEventData
+  | AgentProgressEventData
   | AgentUpdateEventData
+  | WebSearchEventData
   | RiskUpdateEventData
   | DecisionEventData
+  | ReportUpdateEventData
   | CompleteEventData
   | ErrorEventData;
 
@@ -285,9 +350,13 @@ export type EventHandler<T extends StreamEventData = StreamEventData> = (
 export interface EventHandlers {
   onStart?: EventHandler<StartEventData>;
   onQueryParsed?: EventHandler<QueryParsedEventData>;
+  onAgentStart?: EventHandler<AgentStartEventData>;
+  onAgentProgress?: EventHandler<AgentProgressEventData>;
   onAgentUpdate?: EventHandler<AgentUpdateEventData>;
+  onWebSearch?: EventHandler<WebSearchEventData>;
   onRiskUpdate?: EventHandler<RiskUpdateEventData>;
   onDecision?: EventHandler<DecisionEventData>;
+  onReportUpdate?: EventHandler<ReportUpdateEventData>;
   onComplete?: EventHandler<CompleteEventData>;
   onError?: EventHandler<ErrorEventData>;
 }

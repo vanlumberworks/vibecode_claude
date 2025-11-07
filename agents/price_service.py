@@ -45,6 +45,23 @@ class PriceService:
         self._cache = {}
         self._cache_timestamps = {}
 
+    def _convert_date_string(self, date: str) -> str:
+        """
+        Convert date string to YYYY-MM-DD format.
+
+        Args:
+            date: Date string in YYYY-MM-DD format or "yesterday"
+
+        Returns:
+            Date string in YYYY-MM-DD format
+        """
+        if date == "yesterday":
+            yesterday = datetime.now() - timedelta(days=1)
+            return yesterday.strftime("%Y-%m-%d")
+
+        # If already in YYYY-MM-DD format, return as-is
+        return date
+
     def get_price(self, pair: str) -> Optional[Dict[str, Any]]:
         """
         Get current price for a trading pair.
@@ -250,21 +267,29 @@ class PriceService:
 
     def _fetch_metal_ohlc(self, base: str, quote: str, date: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch OHLC data for commodities from Metal Price API.
+        Fetch historical data for commodities from Metal Price API.
 
-        API Format: https://api.metalpriceapi.com/v1/ohlc?api_key=KEY&base=XAU&currency=USD&date=2025-01-28
-        Response: {"success":true,"base":"XAU","quote":"USD","timestamp":1738108799,
-                   "rate":{"close":2742.22,"high":2764.96,"low":2735.11,"open":2741.97}}
+        Note: Metal Price API doesn't have a dedicated OHLC endpoint.
+        Using the historical endpoint: https://api.metalpriceapi.com/v1/YYYY-MM-DD
+
+        API Format: https://api.metalpriceapi.com/v1/2025-01-28?api_key=KEY&base=XAU&currencies=USD
+        Response: {"success":true,"base":"XAU","timestamp":1738108799,
+                   "rates":{"USD":0.000365}}
         """
         try:
+            # Convert date string to YYYY-MM-DD format
+            formatted_date = self._convert_date_string(date)
+
+            # Use historical endpoint with date in URL path
+            historical_url = f"{self.METAL_HISTORICAL_URL}/{formatted_date}"
+
             params = {
                 "api_key": self.metal_api_key,
                 "base": base,
-                "currency": quote,
-                "date": date,
+                "currencies": quote,
             }
 
-            response = requests.get(self.METAL_OHLC_URL, params=params, timeout=5)
+            response = requests.get(historical_url, params=params, timeout=5)
             response.raise_for_status()
 
             data = response.json()
@@ -273,17 +298,24 @@ class PriceService:
                 print(f"  ⚠️  Metal OHLC API error: {data.get('error', 'Unknown error')}")
                 return None
 
-            rate = data.get("rate", {})
+            # Metal Price API returns rates dict, not OHLC data
+            rates = data.get("rates", {})
+            rate_value = rates.get(quote, 0)
+
+            # Since Metal Price API doesn't provide OHLC, use the single rate for all values
+            # Convert from base currency rate to actual price (inverse)
+            price = round(1 / rate_value, 2) if rate_value > 0 else 0
 
             return {
                 "pair": f"{base}/{quote}",
-                "open": round(rate.get("open", 0), 2),
-                "high": round(rate.get("high", 0), 2),
-                "low": round(rate.get("low", 0), 2),
-                "close": round(rate.get("close", 0), 2),
-                "date": date,
+                "open": price,
+                "high": price,
+                "low": price,
+                "close": price,
+                "date": formatted_date,
                 "timestamp": data.get("timestamp"),
                 "source": "metalpriceapi",
+                "note": "Metal Price API doesn't provide OHLC data, using single historical rate",
             }
 
         except Exception as e:
@@ -376,12 +408,14 @@ class PriceService:
             if base in self.COMMODITIES:
                 return self._fetch_metal_ohlc(base, quote, date)
             else:
-                # Forex API
+                # Forex API - Convert date string to YYYY-MM-DD format
+                formatted_date = self._convert_date_string(date)
+
                 params = {
                     "api_key": self.forex_api_key,
                     "base": base,
                     "currency": quote,
-                    "date": date,
+                    "date": formatted_date,
                 }
 
                 response = requests.get(self.FOREX_OHLC_URL, params=params, timeout=5)

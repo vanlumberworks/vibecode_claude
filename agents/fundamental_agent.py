@@ -11,12 +11,12 @@ class FundamentalAgent:
     Performs fundamental economic analysis using Gemini LLM for intelligent reasoning.
 
     Now powered by:
-    - Google Search for real-time economic data
     - Gemini LLM for fundamental analysis reasoning
     - Structured JSON output for better LangGraph integration
+    - Fallback to rule-based analysis if LLM fails
 
     Architecture:
-    1. Use Gemini + Google Search to fetch real economic data
+    1. Use Gemini to analyze economic fundamentals
     2. Analyze GDP, inflation, interest rates, central bank policy
     3. Compare base vs quote currency fundamentals
     4. Generate trading outlook with reasoning
@@ -27,23 +27,49 @@ class FundamentalAgent:
         self.name = "FundamentalAgent"
         self.use_llm = use_llm
 
-    async def analyze(self, pair: str) -> Dict[str, Any]:
+    async def analyze(self, pair: str, config: dict = None) -> Dict[str, Any]:
         """
-        Perform fundamental analysis with LLM reasoning and Google Search.
+        Perform fundamental analysis with LLM reasoning.
 
         Args:
             pair: Currency pair (e.g., "EUR/USD", "XAU/USD", "BTC/USD")
+            config: Optional runtime configuration for streaming
 
         Returns:
             Dict with structured fundamental analysis results
         """
+        from langgraph.config import get_stream_writer
+        import time
+
+        start_time = time.time()
+
         try:
+            # Get stream writer for progress updates
+            writer = get_stream_writer()
+
+            # Emit progress: Starting analysis (10% progress)
+            writer({"agent_progress": {
+                "agent": "fundamental",
+                "step": "initializing",
+                "message": f"Starting fundamental analysis for {pair}",
+                "progress_percentage": 10,
+                "execution_start_time": datetime.utcnow().isoformat() + "Z"
+            }})
+
             if self.use_llm:
-                # Use Gemini + Google Search for intelligent analysis
-                return await self._analyze_with_llm(pair)
+                # Emit progress: Using LLM (30% progress)
+                writer({"agent_progress": {
+                    "agent": "fundamental",
+                    "step": "llm_analysis",
+                    "message": "Analyzing economic fundamentals with Gemini",
+                    "progress_percentage": 30
+                }})
+
+                # Use Gemini for intelligent analysis
+                return await self._analyze_with_llm(pair, writer, start_time)
             else:
                 # Fallback to rule-based analysis
-                return self._analyze_rule_based(pair)
+                return self._analyze_rule_based(pair, writer, start_time)
 
         except Exception as e:
             print(f"  ⚠️  Fundamental Agent error: {str(e)}")
@@ -54,10 +80,11 @@ class FundamentalAgent:
                 "data": {},
             }
 
-    async def _analyze_with_llm(self, pair: str) -> Dict[str, Any]:
-        """Use Gemini LLM + Google Search for intelligent fundamental analysis."""
+    async def _analyze_with_llm(self, pair: str, writer, start_time: float) -> Dict[str, Any]:
+        """Use Gemini LLM for intelligent fundamental analysis."""
         from google import genai
         from google.genai import types
+        import time
 
         # Get API key
         api_key = os.getenv("GOOGLE_AI_API_KEY")
@@ -67,37 +94,97 @@ class FundamentalAgent:
         # Initialize Gemini
         client = genai.Client(api_key=api_key)
 
-        # Build analysis prompt
+        # Build analysis prompt (50% progress)
+        writer({"agent_progress": {
+            "agent": "fundamental",
+            "step": "building_prompt",
+            "message": "Building economic analysis prompt",
+            "progress_percentage": 50
+        }})
+
         prompt = self._build_fundamental_prompt(pair)
 
-        # Configure Gemini with Google Search for real economic data
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
-
+        # Configure Gemini without Google Search (to avoid API conflicts with JSON response)
         config = types.GenerateContentConfig(
             temperature=0.3,
             response_mime_type="application/json",
-            tools=[grounding_tool],
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
-        # Generate analysis
+        # Generate analysis (60% progress)
+        writer({"agent_progress": {
+            "agent": "fundamental",
+            "step": "calling_gemini",
+            "message": "Calling Gemini API for economic analysis",
+            "progress_percentage": 60
+        }})
+
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[prompt],
             config=config
         )
 
-        # Parse response
-        analysis = json.loads(response.text)
+        # Parse response (75% progress)
+        writer({"agent_progress": {
+            "agent": "fundamental",
+            "step": "parsing_response",
+            "message": "Processing fundamental analysis results",
+            "progress_percentage": 75
+        }})
 
-        # Extract grounding if available
-        sources = []
-        search_queries = []
-        if response.candidates[0].grounding_metadata:
-            metadata = response.candidates[0].grounding_metadata
-            search_queries = metadata.web_search_queries or []
-            if metadata.grounding_chunks:
-                sources = [{"title": c.web.title, "url": c.web.uri} for c in metadata.grounding_chunks]
+        response_text = response.text.strip()
+
+        # Remove markdown code blocks if present
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+
+        response_text = response_text.strip()
+
+        # Try to parse JSON with error handling
+        try:
+            if not response_text:
+                raise ValueError("Empty response from Gemini")
+            analysis = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            # If JSON parsing fails, fall back to rule-based analysis
+            print(f"     ⚠️  Failed to parse LLM response as JSON: {str(e)}")
+            print(f"     ⚠️  Response text: {response_text[:200]}")
+            print(f"     ⚠️  Falling back to rule-based analysis")
+            return self._analyze_rule_based(pair, writer, start_time)
+
+        # Emit intermediate data (90% progress)
+        outlook = analysis.get("outlook", "neutral")
+        fundamental_score = analysis.get("fundamental_score", 0.0)
+        writer({"agent_progress": {
+            "agent": "fundamental",
+            "step": "analysis_complete",
+            "message": f"Outlook: {outlook} (score: {fundamental_score:+.2f})",
+            "progress_percentage": 90,
+            "intermediate_data": {
+                "outlook": outlook,
+                "fundamental_score": fundamental_score,
+                "key_factors": analysis.get("key_factors", [])[:2]  # Show first 2 factors
+            }
+        }})
+
+        elapsed = time.time() - start_time
+        execution_end_time = datetime.utcnow().isoformat() + "Z"
+
+        # Emit completion (100% progress)
+        writer({"agent_progress": {
+            "agent": "fundamental",
+            "step": "complete",
+            "message": f"Fundamental analysis complete in {elapsed:.2f}s",
+            "progress_percentage": 100,
+            "execution_end_time": execution_end_time,
+            "execution_time": elapsed
+        }})
 
         # Build structured result
         return {
@@ -111,8 +198,8 @@ class FundamentalAgent:
                 "quote_currency": analysis.get("quote_currency", {}),
                 # Comparison
                 "comparison": analysis.get("comparison", {}),
-                "fundamental_score": analysis.get("fundamental_score", 0.0),
-                "outlook": analysis.get("outlook", "neutral"),
+                "fundamental_score": fundamental_score,
+                "outlook": outlook,
                 # LLM reasoning
                 "analysis": analysis.get("analysis", ""),
                 "reasoning": analysis.get("reasoning", ""),
@@ -122,20 +209,37 @@ class FundamentalAgent:
                 "analysis_timestamp": datetime.utcnow().isoformat(),
                 "summary": analysis.get("summary", ""),
                 "data_source": "llm_analysis",
-                "search_queries": search_queries,
-                "sources": sources,
+                # Execution timing
+                "execution_time": elapsed,
+                "execution_start_time": start_time,
+                "execution_end_time": execution_end_time
             },
         }
 
-    def _analyze_rule_based(self, pair: str) -> Dict[str, Any]:
+    def _analyze_rule_based(self, pair: str, writer, start_time: float) -> Dict[str, Any]:
         """Fallback rule-based analysis (original logic)."""
         import random
+        import time
 
         try:
-            # Extract currencies
+            # Extract currencies (50% progress)
+            writer({"agent_progress": {
+                "agent": "fundamental",
+                "step": "extracting_currencies",
+                "message": "Extracting currency information",
+                "progress_percentage": 50
+            }})
+
             base, quote = pair.split("/")
 
-            # Get mock economic data
+            # Get mock economic data (70% progress)
+            writer({"agent_progress": {
+                "agent": "fundamental",
+                "step": "fetching_data",
+                "message": f"Fetching economic data for {base} and {quote}",
+                "progress_percentage": 70
+            }})
+
             base_data = self._get_mock_economic_data(base)
             quote_data = self._get_mock_economic_data(quote)
 
@@ -144,6 +248,32 @@ class FundamentalAgent:
 
             # Calculate fundamental score
             fundamental_score = self._calculate_score(comparison)
+            outlook = self._get_outlook(fundamental_score)
+
+            # Emit intermediate data (90% progress)
+            writer({"agent_progress": {
+                "agent": "fundamental",
+                "step": "analysis_complete",
+                "message": f"Outlook: {outlook} (score: {fundamental_score:+.2f})",
+                "progress_percentage": 90,
+                "intermediate_data": {
+                    "outlook": outlook,
+                    "fundamental_score": fundamental_score
+                }
+            }})
+
+            elapsed = time.time() - start_time
+            execution_end_time = datetime.utcnow().isoformat() + "Z"
+
+            # Emit completion (100% progress)
+            writer({"agent_progress": {
+                "agent": "fundamental",
+                "step": "complete",
+                "message": f"Rule-based analysis complete in {elapsed:.2f}s",
+                "progress_percentage": 100,
+                "execution_end_time": execution_end_time,
+                "execution_time": elapsed
+            }})
 
             return {
                 "success": True,
@@ -160,10 +290,14 @@ class FundamentalAgent:
                     },
                     "comparison": comparison,
                     "fundamental_score": fundamental_score,
-                    "outlook": self._get_outlook(fundamental_score),
+                    "outlook": outlook,
                     "analysis_timestamp": datetime.utcnow().isoformat(),
                     "summary": self._generate_summary(base, quote, fundamental_score),
                     "data_source": "rule_based",
+                    # Execution timing
+                    "execution_time": elapsed,
+                    "execution_start_time": start_time,
+                    "execution_end_time": execution_end_time
                 },
             }
 
@@ -303,7 +437,7 @@ ASSET TYPES:
 
 ANALYSIS REQUIREMENTS:
 
-1. **Economic Data Collection** (Use Google Search for real data)
+1. **Economic Data Analysis** (Use your knowledge and training data)
 
    For currencies (EUR, USD, GBP, JPY, etc.):
    - Current GDP growth rate (annual %)
@@ -312,7 +446,7 @@ ANALYSIS REQUIREMENTS:
    - Unemployment rate (%)
    - Trade balance (billions)
    - Government debt-to-GDP (%)
-   - Recent central bank policy statements
+   - Recent central bank policy trends
 
    For commodities (XAU, XAG, etc.):
    - Supply/demand fundamentals
@@ -404,12 +538,12 @@ OUTPUT FORMAT (JSON):
 }}
 
 CRITICAL:
-- Use REAL economic data from Google Search
+- Use your knowledge and training data for economic analysis
 - Be objective and data-driven
 - Consider both short-term and long-term fundamentals
 - For commodities/crypto, adapt analysis to relevant metrics
-- If data is unavailable, state "data not available" rather than guessing
-- Recent data is more valuable than historical averages
+- Provide reasonable estimates based on typical economic conditions
+- Focus on relative comparisons between base and quote
 
 Analyze now: {pair}
 """

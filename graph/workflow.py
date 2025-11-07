@@ -7,8 +7,10 @@ from graph.parallel_nodes import parallel_analysis_node
 from graph.nodes import (
     risk_node,
     synthesis_node,
+    report_node,
     should_continue_after_risk,
     route_after_synthesis,
+    route_after_report,
 )
 
 
@@ -16,18 +18,20 @@ def build_forex_workflow():
     """
     Build and compile the forex trading LangGraph workflow.
 
-    NEW ARCHITECTURE (v2):
+    ARCHITECTURE (v2 + Report + Advisory Risk):
     1. Query Parser: Natural language → Structured JSON context
     2. Parallel Analysis: News + Technical + Fundamental (simultaneous)
-    3. Risk Assessment: Validate trade parameters
-    4. Conditional: If risk approved → Synthesis, else → End
-    5. Synthesis: Gemini + Google Search for final decision
+    3. Risk Assessment: Advisory analysis of trade parameters (non-blocking)
+    4. Synthesis: Gemini + Google Search for final decision (always runs)
+    5. Report Generation: LLM-powered PDF-ready HTML report
     6. End
 
     Improvements:
     - Accepts natural language queries (e.g., "Analyze gold trading")
     - 3x faster (parallel vs sequential agents)
     - Richer context passed to all agents
+    - Risk assessment is advisory only (won't block decisions)
+    - Comprehensive HTML report generation with disclaimers
     - Better user experience
 
     Returns:
@@ -41,6 +45,7 @@ def build_forex_workflow():
     workflow.add_node("parallel_analysis", parallel_analysis_node)
     workflow.add_node("risk", risk_node)
     workflow.add_node("synthesis", synthesis_node)
+    workflow.add_node("report", report_node)
 
     # Set entry point - starts with query parsing
     workflow.set_entry_point("query_parser")
@@ -50,22 +55,30 @@ def build_forex_workflow():
     workflow.add_edge("parallel_analysis", "risk")
 
     # Conditional edge after risk assessment
-    # If risk approved, continue to synthesis
-    # If risk rejected, end immediately
+    # Risk is ADVISORY ONLY - always continue to synthesis
+    # The synthesis agent considers risk but won't be blocked by it
     workflow.add_conditional_edges(
         "risk",
         should_continue_after_risk,
         {
             "continue": "synthesis",
-            "end": END,
+            "end": END,  # Never reached - kept for API compatibility
         },
     )
 
-    # After synthesis, always end
-    # (Could add human-in-the-loop or verification here)
+    # After synthesis, route to report generation
     workflow.add_conditional_edges(
         "synthesis",
         route_after_synthesis,
+        {
+            "report": "report",
+        },
+    )
+
+    # After report generation, always end
+    workflow.add_conditional_edges(
+        "report",
+        route_after_report,
         {
             "end": END,
         },
@@ -97,7 +110,7 @@ def visualize_workflow(app=None):
         display(Image(png_data))
     except ImportError:
         print("Visualization requires IPython. Install with: pip install ipython")
-        print("\nWorkflow structure (v2 - with parallel execution):")
+        print("\nWorkflow structure (v2 - with parallel execution + advisory risk + report generation):")
         print("  START")
         print("    ↓")
         print("  query_parser_node")
@@ -107,11 +120,11 @@ def visualize_workflow(app=None):
         print("    ├─ technical_node")
         print("    └─ fundamental_node")
         print("    ↓")
-        print("  risk_node")
+        print("  risk_node (advisory only)")
         print("    ↓")
-        print("  [Risk Approved?]")
-        print("    ↓ Yes          ↓ No")
-        print("  synthesis_node   END")
+        print("  synthesis_node")
+        print("    ↓")
+        print("  report_node")
         print("    ↓")
         print("  END")
 

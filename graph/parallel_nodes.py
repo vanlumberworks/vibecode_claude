@@ -1,11 +1,15 @@
 """Parallel execution node for running multiple agents simultaneously using asyncio."""
 
 import asyncio
+import time
 from typing import Dict, Any
 from langchain_core.runnables import RunnableConfig
 
 from graph.state import ForexAgentState
 from graph.nodes import news_node, technical_node, fundamental_node
+from utils.logger import get_logger, log_error
+
+logger = get_logger(__name__)
 
 
 async def parallel_analysis_node(state: ForexAgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -27,7 +31,10 @@ async def parallel_analysis_node(state: ForexAgentState, config: RunnableConfig)
     Returns:
         State updates with all three agent results
     """
-    print(f"⚡ Running parallel analysis (News + Technical + Fundamental) with asyncio...")
+    pair = state.get("pair", "UNKNOWN")
+    logger.info(f"⚡ [PARALLEL NODE] Starting parallel analysis for {pair}")
+    logger.info("⚡ [PARALLEL NODE] Launching 3 agents concurrently: News, Technical, Fundamental")
+    start_time = time.time()
 
     try:
         # Run all agents concurrently with asyncio.gather()
@@ -37,6 +44,9 @@ async def parallel_analysis_node(state: ForexAgentState, config: RunnableConfig)
             fundamental_node(state, config),
             return_exceptions=True  # Don't fail entire operation if one agent fails
         )
+
+        elapsed = time.time() - start_time
+        logger.info(f"⚡ [PARALLEL NODE] All agents completed in {elapsed:.2f}s")
 
         news_update, technical_update, fundamental_update = results
 
@@ -76,14 +86,18 @@ async def parallel_analysis_node(state: ForexAgentState, config: RunnableConfig)
 
         # Merge errors if any
         errors = {}
-        if news_update.get("errors"):
-            errors.update(news_update["errors"])
-        if technical_update.get("errors"):
-            errors.update(technical_update["errors"])
-        if fundamental_update.get("errors"):
-            errors.update(fundamental_update["errors"])
+        if isinstance(news_update, dict) and news_update.get("errors"):
+            if isinstance(news_update["errors"], dict):
+                errors.update(news_update["errors"])
+        if isinstance(technical_update, dict) and technical_update.get("errors"):
+            if isinstance(technical_update["errors"], dict):
+                errors.update(technical_update["errors"])
+        if isinstance(fundamental_update, dict) and fundamental_update.get("errors"):
+            if isinstance(fundamental_update["errors"], dict):
+                errors.update(fundamental_update["errors"])
 
-        print(f"  ✅ Parallel analysis complete")
+        logger.info(f"✅ [PARALLEL NODE] Parallel analysis complete - All 3 agents finished")
+        logger.debug(f"⚡ [PARALLEL NODE] Results: News={news_update is not Exception}, Tech={technical_update is not Exception}, Fund={fundamental_update is not Exception}")
 
         return {
             "news_result": news_update.get("news_result"),
@@ -94,10 +108,12 @@ async def parallel_analysis_node(state: ForexAgentState, config: RunnableConfig)
         }
 
     except Exception as e:
-        print(f"  ❌ Async parallel execution failed: {str(e)}")
+        elapsed = time.time() - start_time
+        log_error(logger, e, "parallel_analysis_node")
+        logger.error(f"❌ [PARALLEL NODE] Async parallel execution failed after {elapsed:.2f}s")
 
         # Fall back to sequential execution
-        print(f"  ⚠️  Falling back to sequential async execution...")
+        logger.warning(f"⚠️  [PARALLEL NODE] Falling back to sequential async execution...")
 
         try:
             news_update = await news_node(state, config)
@@ -113,7 +129,7 @@ async def parallel_analysis_node(state: ForexAgentState, config: RunnableConfig)
                 "technical_result": technical_update.get("technical_result"),
                 "fundamental_result": fundamental_update.get("fundamental_result"),
                 "step_count": fundamental_update.get("step_count", 0),
-                "errors": {**state.get("errors", {}), "parallel_execution": str(e)},
+                "errors": {**(state.get("errors") or {}), "parallel_execution": str(e)},
             }
         except Exception as sequential_error:
             print(f"  ❌ Sequential fallback also failed: {str(sequential_error)}")

@@ -44,6 +44,23 @@ class ForexAgentState(TypedDict):
     # Final decision from synthesis
     decision: Optional[Dict[str, Any]]
 
+    # Report generation result
+    report_result: Optional[Dict[str, Any]]
+    # Structure:
+    # {
+    #   "success": bool,
+    #   "agent": "ReportAgent",
+    #   "html": str,  # PDF-ready HTML content
+    #   "metadata": {
+    #       "generated_at": str,
+    #       "pair": str,
+    #       "action": str,
+    #       "sections": list,
+    #       "word_count": int
+    #   },
+    #   "error": str | None
+    # }
+
     # Metadata
     step_count: int
     should_continue: bool

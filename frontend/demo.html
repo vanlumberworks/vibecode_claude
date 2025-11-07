@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Agent System - Streaming Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .input-section {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .input-section input {
+            flex: 1;
+            padding: 14px 18px;
+            font-size: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .input-section input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-section button {
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .input-section button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .input-section button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .panel h3 {
+            margin-bottom: 16px;
+            color: #1f2937;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-log {
+            max-height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #e5e7eb;
+            transition: all 0.3s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .progress-item.progress {
+            border-color: #3b82f6;
+            animation: pulse 2s infinite;
+        }
+
+        .progress-item.agent_start {
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        .progress-item.milestone {
+            border-color: #8b5cf6;
+            background: #f5f3ff;
+            font-weight: 600;
+        }
+
+        .progress-item.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .progress-item .icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .progress-item .content {
+            flex: 1;
+        }
+
+        .progress-item .message {
+            color: #374151;
+            line-height: 1.5;
+        }
+
+        .progress-item .timestamp {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            transform: translateY(-4px);
+            border-color: #667eea;
+        }
+
+        .card h4 {
+            margin-bottom: 16px;
+            font-size: 1.3rem;
+            color: #1f2937;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .badge.bullish, .badge.buy {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge.bearish, .badge.sell {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge.neutral, .badge.hold, .badge.wait {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge.real {
+            background: #10b981;
+            color: white;
+        }
+
+        .badge.mock {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .field {
+            margin-bottom: 12px;
+        }
+
+        .field strong {
+            color: #4b5563;
+            display: inline-block;
+            min-width: 120px;
+        }
+
+        .field-value {
+            color: #1f2937;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        li:last-child {
+            border-bottom: none;
+        }
+
+        .error-banner {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
+            color: #991b1b;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 8px;
+            height: 20px;
+            margin-bottom: 12px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 Forex Agent System</h1>
+            <p>AI-Powered Trading Analysis with Real-Time Streaming</p>
+            <small>LangGraph + Gemini 2.5 Flash + Google Search</small>
+        </header>
+
+        <div class="main-content">
+            <div class="input-section">
+                <input
+                    type="text"
+                    id="queryInput"
+                    placeholder="Enter trading query (e.g., 'Analyze EUR/USD', 'What's happening with gold?')"
+                    value="Analyze EUR/USD"
+                />
+                <button id="startBtn">Start Analysis</button>
+            </div>
+
+            <div id="errorBanner" class="error-banner" style="display: none;">
+                <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
+
+            <div class="content-grid">
+                <div class="panel">
+                    <h3>📊 Progress</h3>
+                    <div id="progressLog" class="progress-log">
+                        <p style="color: #9ca3af; text-align: center; padding: 40px 20px;">
+                            Enter a query and click "Start Analysis" to begin
+                        </p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>📈 Live Stats</h3>
+                    <div id="statsPanel">
+                        <div class="field">
+                            <strong>Status:</strong>
+                            <span id="statusText">Idle</span>
+                        </div>
+                        <div class="field">
+                            <strong>Current Pair:</strong>
+                            <span id="currentPair">-</span>
+                        </div>
+                        <div class="field">
+                            <strong>Events Received:</strong>
+                            <span id="eventCount">0</span>
+                        </div>
+                        <div class="field">
+                            <strong>Elapsed Time:</strong>
+                            <span id="elapsedTime">0s</span>
+                        </div>
+                        <div class="field">
+                            <strong>Agents Completed:</strong>
+                            <div id="agentStatus" style="margin-top: 8px;">
+                                <span class="badge" style="background: #e5e7eb; color: #6b7280; margin-right: 6px;">📰 News</span>
+                                <span class="badge" style="background: #e5e7eb; color: #6b7280; margin-right: 6px;">📊 Technical</span>
+                                <span class="badge" style="background: #e5e7eb; color: #6b7280;">💼 Fundamental</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="resultsSection" style="display: none;">
+                <h3 style="margin-bottom: 20px; color: #1f2937;">📋 Analysis Results</h3>
+                <div id="resultsGrid" class="results-grid"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Built with ❤️ using LangGraph and Gemini 2.5 Flash</p>
+            <p style="font-size: 0.9rem; margin-top: 8px;">See <code>docs/FRONTEND_INTEGRATION.md</code> for integration guide</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        let eventSource = null;
+        let eventCount = 0;
+        let startTime = null;
+        let timerInterval = null;
+        let results = {
+            queryContext: null,
+            news: null,
+            technical: null,
+            fundamental: null,
+            risk: null,
+            decision: null
+        };
+
+        const queryInput = document.getElementById('queryInput');
+        const startBtn = document.getElementById('startBtn');
+        const progressLog = document.getElementById('progressLog');
+        const errorBanner = document.getElementById('errorBanner');
+        const errorMessage = document.getElementById('errorMessage');
+        const statusText = document.getElementById('statusText');
+        const currentPair = document.getElementById('currentPair');
+        const eventCountEl = document.getElementById('eventCount');
+        const elapsedTime = document.getElementById('elapsedTime');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsGrid = document.getElementById('resultsGrid');
+
+        startBtn.addEventListener('click', startAnalysis);
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') startAnalysis();
+        });
+
+        function startAnalysis() {
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            // Reset state
+            eventCount = 0;
+            startTime = Date.now();
+            results = {
+                queryContext: null,
+                news: null,
+                technical: null,
+                fundamental: null,
+                risk: null,
+                decision: null
+            };
+
+            // UI updates
+            startBtn.disabled = true;
+            startBtn.textContent = 'Analyzing...';
+            progressLog.innerHTML = '';
+            errorBanner.style.display = 'none';
+            resultsSection.style.display = 'none';
+            resultsGrid.innerHTML = '';
+            statusText.textContent = 'Running';
+            currentPair.textContent = '-';
+            eventCountEl.textContent = '0';
+            updateAgentStatus();
+
+            // Start timer
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 100);
+
+            // Start streaming
+            const url = `${API_BASE_URL}/analyze/stream?query=${encodeURIComponent(query)}`;
+            eventSource = new EventSource(url);
+
+            eventSource.addEventListener('start', handleStart);
+            eventSource.addEventListener('agent_progress', handleAgentProgress);
+            eventSource.addEventListener('agent_start', handleAgentStart);
+            eventSource.addEventListener('query_parsed', handleQueryParsed);
+            eventSource.addEventListener('agent_update', handleAgentUpdate);
+            eventSource.addEventListener('risk_update', handleRiskUpdate);
+            eventSource.addEventListener('decision', handleDecision);
+            eventSource.addEventListener('complete', handleComplete);
+            eventSource.addEventListener('error', handleError);
+
+            eventSource.onerror = (err) => {
+                console.error('EventSource error:', err);
+                showError('Stream connection failed');
+                cleanup();
+            };
+        }
+
+        function handleStart(e) {
+            const data = JSON.parse(e.data);
+            incrementEventCount();
+            addProgress('system', '🚀', 'Analysis started', data.timestamp);
+        }
+
+        function handleAgentProgress(e) {
+            const data = JSON.parse(e.data);
+            const progress = data.agent_progress;
+            incrementEventCount();
+
+            const icon = getAgentIcon(progress.agent);
+            const message = `${progress.agent}: ${progress.message}`;
+
+            addProgress('progress', icon, message, new Date().toISOString(), progress.data);
+        }
+
+        function handleAgentStart(e) {
+            const data = JSON.parse(e.data);
+            const start = data.agent_start;
+            incrementEventCount();
+
+            const icon = getAgentIcon(start.agent);
+            addProgress('agent_start', icon, `${start.agent} agent started`, new Date().toISOString());
+        }
+
+        function handleQueryParsed(e) {
+            const data = JSON.parse(e.data);
+            incrementEventCount();
+            results.queryContext = data.query_context;
+            currentPair.textContent = data.pair;
+
+            addProgress('milestone', '✅', `Query parsed: ${data.pair}`, data.timestamp);
+            renderResults();
+        }
+
+        function handleAgentUpdate(e) {
+            const data = JSON.parse(e.data);
+            incrementEventCount();
+
+            const agentName = data.agent;
+            results[agentName] = data.result;
+
+            const icon = getAgentIcon(agentName);
+            addProgress('milestone', icon, `${agentName} agent completed`, data.timestamp);
+
+            updateAgentStatus(agentName, 'complete');
+            renderResults();
+        }
+
+        function handleRiskUpdate(e) {
+            const data = JSON.parse(e.data);
+            incrementEventCount();
+            results.risk = data.risk_result;
+
+            const approved = data.trade_approved;
+            const icon = approved ? '✅' : '❌';
+            const message = approved ? 'Risk approved' : 'Risk rejected';
+
+            addProgress('milestone', icon, message, data.timestamp);
+            renderResults();
+        }
+
+        function handleDecision(e) {
+            const data = JSON.parse(e.data);
+            incrementEventCount();
+            results.decision = data.decision;
+
+            addProgress('milestone', '🎯', `Final decision: ${data.decision.action}`, data.timestamp);
+            renderResults();
+        }
+
+        function handleComplete(e) {
+            const data = JSON.parse(e.data);
+            incrementEventCount();
+
+            addProgress('system', '🎉', 'Analysis complete', data.timestamp);
+            cleanup();
+        }
+
+        function handleError(e) {
+            const data = e.data ? JSON.parse(e.data) : { error: 'Unknown error' };
+            showError(data.error);
+            addProgress('error', '❌', `Error: ${data.error}`, new Date().toISOString());
+            cleanup();
+        }
+
+        function addProgress(type, icon, message, timestamp, data) {
+            const item = document.createElement('div');
+            item.className = `progress-item ${type}`;
+            item.innerHTML = `
+                <div class="icon">${icon}</div>
+                <div class="content">
+                    <div class="message">
+                        ${message}
+                        ${data && data.price ? ` <span class="badge ${data.source}">${data.source === 'real' ? 'LIVE' : 'MOCK'}</span> $${data.price}` : ''}
+                    </div>
+                    <div class="timestamp">${formatTime(timestamp)}</div>
+                </div>
+            `;
+            progressLog.appendChild(item);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        function renderResults() {
+            resultsSection.style.display = 'block';
+            resultsGrid.innerHTML = '';
+
+            if (results.queryContext) {
+                resultsGrid.appendChild(createQueryContextCard(results.queryContext));
+            }
+            if (results.news) {
+                resultsGrid.appendChild(createNewsCard(results.news));
+            }
+            if (results.technical) {
+                resultsGrid.appendChild(createTechnicalCard(results.technical));
+            }
+            if (results.fundamental) {
+                resultsGrid.appendChild(createFundamentalCard(results.fundamental));
+            }
+            if (results.risk) {
+                resultsGrid.appendChild(createRiskCard(results.risk));
+            }
+            if (results.decision) {
+                resultsGrid.appendChild(createDecisionCard(results.decision));
+            }
+        }
+
+        function createQueryContextCard(data) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h4>📝 Query Context</h4>
+                <div class="field">
+                    <strong>Pair:</strong>
+                    <span class="field-value">${data.pair}</span>
+                </div>
+                <div class="field">
+                    <strong>Asset Type:</strong>
+                    <span class="field-value">${data.asset_type}</span>
+                </div>
+                <div class="field">
+                    <strong>Timeframe:</strong>
+                    <span class="field-value">${data.timeframe}</span>
+                </div>
+                <div class="field">
+                    <strong>Intent:</strong>
+                    <span class="field-value">${data.user_intent}</span>
+                </div>
+            `;
+            return card;
+        }
+
+        function createNewsCard(result) {
+            if (!result.data) return document.createElement('div');
+            const data = result.data;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h4>📰 News Analysis</h4>
+                <span class="badge ${data.sentiment}">${data.sentiment}</span>
+                <div class="field">
+                    <strong>Impact:</strong>
+                    <span class="field-value">${data.impact}</span>
+                </div>
+                <p style="margin: 12px 0;">${data.summary}</p>
+                ${data.headlines && data.headlines.length > 0 ? `
+                    <h5 style="margin-top: 16px; margin-bottom: 8px;">Recent Headlines:</h5>
+                    <ul>
+                        ${data.headlines.slice(0, 3).map(h => `
+                            <li>
+                                <strong>${h.title}</strong><br>
+                                <small style="color: #6b7280;">${h.source} - ${h.date}</small>
+                            </li>
+                        `).join('')}
+                    </ul>
+                ` : ''}
+            `;
+            return card;
+        }
+
+        function createTechnicalCard(result) {
+            if (!result.data) return document.createElement('div');
+            const data = result.data;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h4>📊 Technical Analysis</h4>
+                <div class="field">
+                    <strong>Current Price:</strong>
+                    <span class="field-value">$${data.current_price}</span>
+                    <span class="badge ${data.price_source}">${data.price_source}</span>
+                </div>
+                <span class="badge ${data.signals?.overall?.toLowerCase()}">${data.signals?.overall}</span>
+                <div class="field">
+                    <strong>Trend:</strong>
+                    <span class="field-value">${data.trend} (${data.trend_strength})</span>
+                </div>
+                <div class="field">
+                    <strong>Support:</strong>
+                    <span class="field-value">$${data.support}</span>
+                </div>
+                <div class="field">
+                    <strong>Resistance:</strong>
+                    <span class="field-value">$${data.resistance}</span>
+                </div>
+                <p style="margin-top: 12px;">${data.summary}</p>
+            `;
+            return card;
+        }
+
+        function createFundamentalCard(result) {
+            if (!result.data) return document.createElement('div');
+            const data = result.data;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h4>💼 Fundamental Analysis</h4>
+                <span class="badge ${data.outlook}">${data.outlook}</span>
+                <p style="margin: 12px 0;">${data.summary || ''}</p>
+                ${data.key_factors && data.key_factors.length > 0 ? `
+                    <h5 style="margin-top: 16px; margin-bottom: 8px;">Key Factors:</h5>
+                    <ul>
+                        ${data.key_factors.slice(0, 3).map(f => `<li>${f}</li>`).join('')}
+                    </ul>
+                ` : ''}
+            `;
+            return card;
+        }
+
+        function createRiskCard(result) {
+            if (!result.data) return document.createElement('div');
+            const data = result.data;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h4>⚖️ Risk Assessment</h4>
+                <span class="badge ${data.trade_approved ? 'approved' : 'rejected'}">
+                    ${data.trade_approved ? '✓ APPROVED' : '✗ REJECTED'}
+                </span>
+                ${!data.trade_approved ? `
+                    <p style="margin: 12px 0; color: #991b1b;">
+                        <strong>Reason:</strong> ${data.rejection_reason}
+                    </p>
+                ` : ''}
+                <div class="field">
+                    <strong>Position Size:</strong>
+                    <span class="field-value">${data.position_size} lots</span>
+                </div>
+                <div class="field">
+                    <strong>Risk:</strong>
+                    <span class="field-value">$${data.dollar_risk} (${data.risk_percentage}%)</span>
+                </div>
+                ${data.risk_reward_ratio ? `
+                    <div class="field">
+                        <strong>R:R Ratio:</strong>
+                        <span class="field-value">${data.risk_reward_ratio}:1</span>
+                    </div>
+                ` : ''}
+            `;
+            return card;
+        }
+
+        function createDecisionCard(data) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h4>🎯 Final Decision</h4>
+                <span class="badge ${data.action.toLowerCase()}">${data.action}</span>
+                <div class="field">
+                    <strong>Confidence:</strong>
+                    <span class="field-value">${(data.confidence * 100).toFixed(0)}%</span>
+                </div>
+                <p style="margin: 12px 0;">${data.reasoning?.summary || ''}</p>
+                ${data.trade_parameters ? `
+                    <h5 style="margin-top: 16px; margin-bottom: 8px;">Trade Parameters:</h5>
+                    <div class="field">
+                        <strong>Entry:</strong>
+                        <span class="field-value">$${data.trade_parameters.entry_price}</span>
+                    </div>
+                    <div class="field">
+                        <strong>Stop Loss:</strong>
+                        <span class="field-value">$${data.trade_parameters.stop_loss}</span>
+                    </div>
+                    <div class="field">
+                        <strong>Take Profit:</strong>
+                        <span class="field-value">$${data.trade_parameters.take_profit}</span>
+                    </div>
+                ` : ''}
+            `;
+            return card;
+        }
+
+        function updateAgentStatus(agent, status) {
+            const icons = { news: '📰', technical: '📊', fundamental: '💼' };
+            const agentStatus = document.getElementById('agentStatus');
+
+            if (!agent) {
+                agentStatus.innerHTML = Object.entries(icons).map(([name, icon]) =>
+                    `<span class="badge" style="background: #e5e7eb; color: #6b7280; margin-right: 6px;">${icon} ${name}</span>`
+                ).join('');
+                return;
+            }
+
+            const badges = agentStatus.querySelectorAll('.badge');
+            badges.forEach(badge => {
+                if (badge.textContent.includes(icons[agent])) {
+                    if (status === 'complete') {
+                        badge.style.background = '#d1fae5';
+                        badge.style.color = '#065f46';
+                        badge.innerHTML = `${icons[agent]} ${agent} ✓`;
+                    }
+                }
+            });
+        }
+
+        function incrementEventCount() {
+            eventCount++;
+            eventCountEl.textContent = eventCount;
+        }
+
+        function updateTimer() {
+            if (!startTime) return;
+            const elapsed = (Date.now() - startTime) / 1000;
+            elapsedTime.textContent = `${elapsed.toFixed(1)}s`;
+        }
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorBanner.style.display = 'block';
+        }
+
+        function cleanup() {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Analysis';
+            statusText.textContent = 'Complete';
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
+        function getAgentIcon(agent) {
+            const icons = {
+                query_parser: '🔍',
+                news: '📰',
+                technical: '📊',
+                fundamental: '💼',
+                synthesis: '🤖'
+            };
+            return icons[agent] || '📍';
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        // Check API health on load
+        fetch(`${API_BASE_URL}/health`)
+            .then(res => res.json())
+            .then(data => {
+                console.log('✓ Backend API is healthy:', data);
+            })
+            .catch(err => {
+                console.error('✗ Backend API is not available:', err);
+                showError('Backend server is not available. Please start the server.');
+            });
+    </script>
+</body>
+</html>
