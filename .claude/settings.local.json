@@ -9,7 +9,8 @@
       "Bash(pnpm install:*)",
       "Bash(pnpm add:*)",
       "Bash(pnpm build:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pip install:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

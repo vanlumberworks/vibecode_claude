@@ -1,0 +1,58 @@
+# Railway ignore file - excludes Python backend and unnecessary files from frontend deployment
+
+# Python backend files (not needed for frontend deployment)
+../backend/
+../agents/
+../graph/
+../*.py
+../requirements*.txt
+../pytest.ini
+../test_*.py
+
+# Python artifacts
+../__pycache__/
+../*.pyc
+../*.pyo
+../*.pyd
+../.Python
+../pip-log.txt
+../pip-delete-this-directory.txt
+../.venv/
+../venv/
+../env/
+
+# Documentation (not needed for production)
+../docs/
+../CLAUDE.md
+../DEPLOYMENT.md
+../*.md
+
+# Docker files (not using Docker for Railway)
+../Dockerfile
+../.dockerignore
+../docker-compose.yml
+
+# Fly.io config (not using Fly.io)
+../fly.toml
+
+# Git files
+../.git/
+../.gitignore
+
+# IDE files
+../.vscode/
+../.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frontend dev files (these are in frontend/ but not needed in production)
+node_modules/
+.env.local
+.env.development
+*.log
+coverage/
