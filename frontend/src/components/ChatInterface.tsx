@@ -82,7 +82,7 @@ export function ChatInterface({ onSubmit, isAnalyzing }: ChatInterfaceProps) {
         >
           <h1 className="text-7xl font-bold mb-4 text-glow-gold">
             <span className="bg-gradient-to-r from-[#f59e0b] via-[#fbbf24] to-[#f59e0b] bg-clip-text text-transparent">
-              FOREX TERMINAL
+              TRADING AGENT SYSTEM
             </span>
           </h1>
           <p className="text-xl text-[hsl(var(--text-secondary))] font-mono">
@@ -99,9 +99,8 @@ export function ChatInterface({ onSubmit, isAnalyzing }: ChatInterfaceProps) {
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           <div
-            className={`glass rounded-2xl p-2 transition-all duration-300 ${
-              isFocused ? 'glow-gold' : ''
-            }`}
+            className={`glass rounded-2xl p-2 transition-all duration-300 ${isFocused ? 'glow-gold' : ''
+              }`}
           >
             <div className="flex items-center gap-3 px-4 py-3">
               <span className="text-2xl">🔍</span>
@@ -118,11 +117,10 @@ export function ChatInterface({ onSubmit, isAnalyzing }: ChatInterfaceProps) {
               <button
                 type="submit"
                 disabled={!query.trim() || isAnalyzing}
-                className={`px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                  query.trim() && !isAnalyzing
-                    ? 'bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] text-[hsl(var(--bg-primary))] hover:glow-gold'
-                    : 'bg-[hsl(var(--bg-tertiary))] text-[hsl(var(--text-muted))] cursor-not-allowed'
-                }`}
+                className={`px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${query.trim() && !isAnalyzing
+                  ? 'bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] text-[hsl(var(--bg-primary))] hover:glow-gold'
+                  : 'bg-[hsl(var(--bg-tertiary))] text-[hsl(var(--text-muted))] cursor-not-allowed'
+                  }`}
               >
                 {isAnalyzing ? (
                   <span className="flex items-center gap-2">
@@ -146,7 +144,7 @@ export function ChatInterface({ onSubmit, isAnalyzing }: ChatInterfaceProps) {
           >
             <div className="text-center mb-6">
               <p className="text-sm text-[hsl(var(--text-secondary))] font-mono uppercase tracking-wider">
-                Try these popular queries
+                Try these popular prompts
               </p>
             </div>
 
@@ -194,7 +192,7 @@ export function ChatInterface({ onSubmit, isAnalyzing }: ChatInterfaceProps) {
           <div className="inline-flex items-center gap-2 glass px-4 py-2 rounded-full">
             <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
             <span className="text-sm text-[hsl(var(--text-secondary))] font-mono">
-              API Connected • LangGraph + Gemini 2.5 Flash
+              API Connected • Multi-Agent System
             </span>
           </div>
         </motion.div>

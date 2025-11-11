@@ -5,7 +5,7 @@ Production-ready React frontend for the Forex Agent System with real-time stream
 ## 🎯 Features
 
 - **Chat Interface** - Interactive chat-style UI for submitting queries
-- **Real-Time Streaming** - Live updates from LangGraph workflow
+- **Real-Time Streaming** - Live updates from multi-agent workflow
 - **Event Visualization** - See all agent events, web searches, and reasoning
 - **Full Report Generation** - Comprehensive analysis report with trade parameters
 - **shadcn/ui Components** - Beautiful, accessible UI components
