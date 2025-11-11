@@ -10,7 +10,15 @@
       "Bash(pnpm add:*)",
       "Bash(pnpm build:*)",
       "Bash(find:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(git add:*)",
+      "Bash(cat:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix Railway deployment: Add frontend Dockerfile and resolve TypeScript build errors\n\n- Add frontend-specific Dockerfile for Railway deployment with multi-stage build\n  - Uses Node.js 20 Alpine with pnpm via corepack\n  - Optimized production image with vite preview server\n  \n- Add comprehensive Railway setup guide (RAILWAY_SETUP_QUICK_START.md)\n  - Step-by-step instructions for configuring Root Directory\n  - Troubleshooting common deployment issues\n  - Alternative deployment approaches\n  \n- Fix TypeScript build errors:\n  - AgentExecutionDetails.tsx: Add null check for Object.entries to prevent\n    \"Type 'null' is not assignable to parameter\" error\n  - tsconfig.json: Add vite/client types for proper module resolution\n\nRailway deployment now works correctly when Root Directory is set to ''frontend''.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(VITE_API_URL=https://fx-agent-prod-thrumming-smoke-7736.fly.dev pnpm build:*)",
+      "Bash(git commit:*)",
+      "Bash(pnpm build:check:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
