@@ -24,22 +24,28 @@ def format_for_twitter(
     Returns:
         Formatted tweet string (max 280 chars)
     """
-    decision = result.get('decision', 'WAIT')
+    decision_data = result.get('decision', {})
+    action = decision_data.get('action', 'WAIT') if isinstance(decision_data, dict) else decision_data
     pair = result.get('pair', 'N/A')
-    reasoning = result.get('reasoning', '')
+
+    # Get reasoning - handle both nested and flat structures
+    reasoning_data = decision_data.get('reasoning', {}) if isinstance(decision_data, dict) else {}
+    reasoning = reasoning_data.get('summary', '') if isinstance(reasoning_data, dict) else str(reasoning_data)
 
     # Check if this is a trading signal
-    is_signal = decision in ['BUY', 'SELL'] and include_trade_params
+    is_signal = action in ['BUY', 'SELL'] and include_trade_params
 
     if is_signal:
-        entry = result.get('entry_price', 'N/A')
-        stop_loss = result.get('stop_loss', 'N/A')
-        target = result.get('target_price', 'N/A')
+        # Get trade parameters from nested structure
+        trade_params = decision_data.get('trade_parameters', {}) if isinstance(decision_data, dict) else {}
+        entry = trade_params.get('entry_price', 'N/A')
+        stop_loss = trade_params.get('stop_loss', 'N/A')
+        target = trade_params.get('take_profit', trade_params.get('target_price', 'N/A'))  # Handle both names
 
         # Ultra-concise format for signals
-        emoji = "🟢" if decision == "BUY" else "🔴"
+        emoji = "🟢" if action == "BUY" else "🔴"
         post = (
-            f"{emoji} {pair} {decision} @ {entry}\n"
+            f"{emoji} {pair} {action} @ {entry}\n"
             f"🎯 Target: {target} | 🛡️ Stop: {stop_loss}\n"
         )
 
@@ -84,28 +90,41 @@ def format_for_telegram(
     Returns:
         Formatted message with markdown
     """
-    decision = result.get('decision', 'WAIT')
+    decision_data = result.get('decision', {})
+    action = decision_data.get('action', 'WAIT') if isinstance(decision_data, dict) else decision_data
     pair = result.get('pair', 'N/A')
-    reasoning = result.get('reasoning', '')
-    confidence = result.get('confidence', 'Medium')
+
+    # Get reasoning and confidence from nested structure
+    reasoning_data = decision_data.get('reasoning', {}) if isinstance(decision_data, dict) else {}
+    reasoning = reasoning_data.get('summary', '') if isinstance(reasoning_data, dict) else str(reasoning_data)
+    confidence_pct = decision_data.get('confidence', 0.5) if isinstance(decision_data, dict) else 0.5
+    confidence = f"{confidence_pct:.0%}" if isinstance(confidence_pct, (int, float)) else str(confidence_pct)
 
     # Header
     emoji_map = {"BUY": "🟢", "SELL": "🔴", "WAIT": "⏸️"}
-    emoji = emoji_map.get(decision, "📊")
+    emoji = emoji_map.get(action, "📊")
 
-    post = f"{emoji} **{pair} - {decision} Signal**\n\n"
+    post = f"{emoji} **{pair} - {action} Signal**\n\n"
 
     if channel_name:
         post = f"📡 **{channel_name}**\n\n" + post
 
     # Trading parameters
-    is_signal = decision in ['BUY', 'SELL'] and include_trade_params
+    is_signal = action in ['BUY', 'SELL'] and include_trade_params
 
     if is_signal:
-        entry = result.get('entry_price', 'N/A')
-        stop_loss = result.get('stop_loss', 'N/A')
-        target = result.get('target_price', 'N/A')
-        risk_reward = result.get('risk_reward_ratio', 'N/A')
+        trade_params = decision_data.get('trade_parameters', {}) if isinstance(decision_data, dict) else {}
+        entry = trade_params.get('entry_price', 'N/A')
+        stop_loss = trade_params.get('stop_loss', 'N/A')
+        target = trade_params.get('take_profit', trade_params.get('target_price', 'N/A'))
+
+        # Calculate risk/reward if we have the data
+        risk_reward = 'N/A'
+        if isinstance(entry, (int, float)) and isinstance(stop_loss, (int, float)) and isinstance(target, (int, float)):
+            risk = abs(entry - stop_loss)
+            reward = abs(target - entry)
+            if risk > 0:
+                risk_reward = f"{reward/risk:.1f}"
 
         post += "**Trade Parameters:**\n"
         post += f"• Entry: `{entry}`\n"
@@ -119,11 +138,13 @@ def format_for_telegram(
     post += f"{reasoning}\n\n"
 
     # Citations if available
-    if 'citations' in result and result['citations']:
+    grounding = decision_data.get('grounding_metadata', {}) if isinstance(decision_data, dict) else {}
+    sources = grounding.get('sources', [])
+    if sources:
         post += "**Sources:**\n"
-        for i, citation in enumerate(result['citations'][:3], 1):  # Max 3 sources
-            title = citation.get('title', 'Source')
-            url = citation.get('url', '#')
+        for i, source in enumerate(sources[:3], 1):  # Max 3 sources
+            title = source.get('title', 'Source')
+            url = source.get('url', '#')
             post += f"{i}. [{title}]({url})\n"
         post += "\n"
 
@@ -152,18 +173,22 @@ def format_for_facebook(
     Returns:
         Formatted Facebook post
     """
-    decision = result.get('decision', 'WAIT')
+    decision_data = result.get('decision', {})
+    action = decision_data.get('action', 'WAIT') if isinstance(decision_data, dict) else decision_data
     pair = result.get('pair', 'N/A')
-    reasoning = result.get('reasoning', '')
+
+    # Get reasoning from nested structure
+    reasoning_data = decision_data.get('reasoning', {}) if isinstance(decision_data, dict) else {}
+    reasoning = reasoning_data.get('summary', '') if isinstance(reasoning_data, dict) else str(reasoning_data)
 
     # Friendly opening
     emoji_map = {"BUY": "🟢", "SELL": "🔴", "WAIT": "⏸️"}
-    emoji = emoji_map.get(decision, "📊")
+    emoji = emoji_map.get(action, "📊")
 
-    is_signal = decision in ['BUY', 'SELL'] and include_trade_params
+    is_signal = action in ['BUY', 'SELL'] and include_trade_params
 
     if is_signal:
-        post = f"{emoji} **{pair} Trading Analysis - {decision} Setup**\n\n"
+        post = f"{emoji} **{pair} Trading Analysis - {action} Setup**\n\n"
     else:
         post = f"{emoji} **{pair} Market Analysis**\n\n"
 
@@ -172,13 +197,21 @@ def format_for_facebook(
 
     # Trade parameters in readable format
     if is_signal:
-        entry = result.get('entry_price', 'N/A')
-        stop_loss = result.get('stop_loss', 'N/A')
-        target = result.get('target_price', 'N/A')
-        risk_reward = result.get('risk_reward_ratio', 'N/A')
+        trade_params = decision_data.get('trade_parameters', {}) if isinstance(decision_data, dict) else {}
+        entry = trade_params.get('entry_price', 'N/A')
+        stop_loss = trade_params.get('stop_loss', 'N/A')
+        target = trade_params.get('take_profit', trade_params.get('target_price', 'N/A'))
+
+        # Calculate risk/reward
+        risk_reward = 'N/A'
+        if isinstance(entry, (int, float)) and isinstance(stop_loss, (int, float)) and isinstance(target, (int, float)):
+            risk = abs(entry - stop_loss)
+            reward = abs(target - entry)
+            if risk > 0:
+                risk_reward = f"{reward/risk:.1f}"
 
         post += "**📋 Trade Setup:**\n"
-        post += f"Direction: {decision}\n"
+        post += f"Direction: {action}\n"
         post += f"Entry Level: {entry}\n"
         post += f"Profit Target: {target}\n"
         post += f"Stop Loss: {stop_loss}\n"
@@ -186,11 +219,11 @@ def format_for_facebook(
 
     # Educational context for broader audience
     if educational_context:
-        if decision == "BUY":
+        if action == "BUY":
             post += "💡 **What does this mean?**\n"
             post += f"This analysis suggests {pair} may strengthen. "
             post += "Traders might consider long positions with proper risk management.\n\n"
-        elif decision == "SELL":
+        elif action == "SELL":
             post += "💡 **What does this mean?**\n"
             post += f"This analysis suggests {pair} may weaken. "
             post += "Traders might consider short positions with proper risk management.\n\n"
@@ -251,6 +284,40 @@ def format_all_platforms(
 # Helper function to detect if result contains a trading signal
 def is_trading_signal(result: Dict[str, Any]) -> bool:
     """Check if analysis result contains an actionable trading signal."""
-    decision = result.get('decision', 'WAIT')
-    has_params = all(key in result for key in ['entry_price', 'stop_loss', 'target_price'])
-    return decision in ['BUY', 'SELL'] and has_params
+    decision_data = result.get('decision', {})
+    action = decision_data.get('action', 'WAIT') if isinstance(decision_data, dict) else decision_data
+
+    # Check for trade parameters in nested structure
+    trade_params = decision_data.get('trade_parameters', {}) if isinstance(decision_data, dict) else {}
+    has_params = all(
+        trade_params.get(key) is not None
+        for key in ['entry_price', 'stop_loss']
+    ) and (trade_params.get('take_profit') is not None or trade_params.get('target_price') is not None)
+
+    return action in ['BUY', 'SELL'] and has_params
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """
+    Copy text to clipboard (for UX convenience).
+
+    Args:
+        text: Text to copy to clipboard
+
+    Returns:
+        True if successful, False otherwise
+
+    Note:
+        This uses pyperclip which needs to be installed: pip install pyperclip
+        On Linux, may require xclip or xsel to be installed.
+    """
+    try:
+        import pyperclip
+        pyperclip.copy(text)
+        return True
+    except ImportError:
+        print("⚠️  pyperclip not installed. Run: pip install pyperclip")
+        return False
+    except Exception as e:
+        print(f"⚠️  Could not copy to clipboard: {e}")
+        return False
