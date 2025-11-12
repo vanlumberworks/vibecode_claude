@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { Reasoning, ReasoningTrigger, ReasoningContent } from './ui/reasoning'
+import { SocialMediaShare } from './SocialMediaShare'
 import type { AnalysisState } from '../hooks/useForexAnalysis'
 
 interface ComprehensiveReportProps {
@@ -381,6 +382,25 @@ export function ComprehensiveReport({ state, onNewAnalysis }: ComprehensiveRepor
                     </div>
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+            {/* Social Media Share */}
+            {state.finalResult && (
+              <motion.div
+                className="glass rounded-2xl p-6 glow-subtle"
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.8, delay: 0.5 }}
+              >
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span>📱</span>
+                  <span>Share Analysis</span>
+                </h3>
+                <SocialMediaShare
+                  result={state.finalResult}
+                  apiUrl={import.meta.env.VITE_API_URL || 'http://localhost:8000'}
+                />
               </motion.div>
             )}
 

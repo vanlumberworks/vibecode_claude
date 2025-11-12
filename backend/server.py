@@ -14,6 +14,13 @@ from dotenv import load_dotenv
 
 from backend.streaming_adapter import StreamingForexSystem
 from utils.logger import get_logger
+from utils.social_formatter import (
+    format_for_twitter,
+    format_for_telegram,
+    format_for_facebook,
+    format_all_platforms,
+    is_trading_signal
+)
 
 logger = get_logger(__name__)
 
@@ -65,6 +72,24 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     api_configured: bool
+
+
+class SocialFormatRequest(BaseModel):
+    """Request model for social media formatting."""
+    result: dict  # Analysis result from /analyze endpoint
+    platform: Optional[str] = "all"  # 'twitter', 'telegram', 'facebook', or 'all'
+    include_trade_params: Optional[bool] = True
+    custom_options: Optional[dict] = None
+
+
+class SocialFormatResponse(BaseModel):
+    """Response model for social media formatting."""
+    platform: str
+    post: Optional[str] = None
+    posts: Optional[dict] = None  # For 'all' platform
+    char_count: Optional[int] = None
+    is_signal: bool
+    error: Optional[str] = None
 
 
 # Health check endpoint
@@ -249,6 +274,97 @@ async def analyze_stream_get(
     return await analyze_stream(analysis_request, request)
 
 
+# Social media formatting endpoint
+@app.post("/api/format-social", response_model=SocialFormatResponse)
+async def format_social_post(request: SocialFormatRequest):
+    """
+    Format analysis result for social media platforms.
+
+    Supports Twitter (280 chars), Telegram (markdown), and Facebook (long-form).
+    Can generate all formats at once or individual platform posts.
+
+    Args:
+        request: Contains analysis result, platform choice, and formatting options
+
+    Returns:
+        Formatted post(s) ready for sharing
+    """
+    try:
+        result = request.result
+        platform = request.platform.lower() if request.platform else "all"
+        include_params = request.include_trade_params
+        custom_opts = request.custom_options or {}
+
+        # Check if it's a trading signal
+        signal = is_trading_signal(result)
+
+        if platform == "all":
+            # Generate all platforms
+            posts = format_all_platforms(
+                result,
+                include_trade_params=include_params,
+                custom_options=custom_opts
+            )
+            return SocialFormatResponse(
+                platform="all",
+                posts=posts,
+                is_signal=signal
+            )
+
+        elif platform == "twitter":
+            post = format_for_twitter(
+                result,
+                include_trade_params=include_params,
+                custom_hashtags=custom_opts.get('twitter_hashtags')
+            )
+            return SocialFormatResponse(
+                platform="twitter",
+                post=post,
+                char_count=len(post),
+                is_signal=signal
+            )
+
+        elif platform == "telegram":
+            post = format_for_telegram(
+                result,
+                include_trade_params=include_params,
+                channel_name=custom_opts.get('telegram_channel')
+            )
+            return SocialFormatResponse(
+                platform="telegram",
+                post=post,
+                char_count=len(post),
+                is_signal=signal
+            )
+
+        elif platform == "facebook":
+            post = format_for_facebook(
+                result,
+                include_trade_params=include_params,
+                educational_context=custom_opts.get('facebook_educational', True)
+            )
+            return SocialFormatResponse(
+                platform="facebook",
+                post=post,
+                char_count=len(post),
+                is_signal=signal
+            )
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid platform: {platform}. Must be 'twitter', 'telegram', 'facebook', or 'all'"
+            )
+
+    except Exception as e:
+        logger.error(f"❌ [FORMAT-SOCIAL] Error formatting post: {str(e)}")
+        return SocialFormatResponse(
+            platform=request.platform or "unknown",
+            error=str(e),
+            is_signal=False
+        )
+
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -262,6 +378,7 @@ async def root():
             "info": "/info",
             "analyze": "/analyze (POST)",
             "stream": "/analyze/stream (POST or GET)",
+            "format-social": "/api/format-social (POST)",
             "docs": "/docs"
         },
         "documentation": "/docs"

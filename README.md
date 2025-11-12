@@ -16,6 +16,7 @@ A production-ready multi-agent forex trading analysis system using **LangGraph**
 - **Real-Time Data**: Google Search grounding for up-to-date market information
 - **Source Citations**: Every decision includes web sources
 - **Risk Management**: Built-in position sizing and risk validation
+- **Social Media Integration**: Format analysis for Twitter, Telegram, and Facebook
 - **Production-Ready**: Proper error handling, logging, and structure
 
 ## 📋 Architecture
@@ -256,6 +257,56 @@ sources = result["decision"]["grounding_metadata"]["sources"]
 for source in sources:
     print(f"{source['title']}: {source['url']}")
 ```
+
+### Social Media Formatting
+
+Generate platform-optimized posts from analysis results:
+
+```python
+from system import ForexAgentSystem
+from utils.social_formatter import (
+    format_for_twitter,
+    format_for_telegram,
+    format_for_facebook,
+    format_all_platforms
+)
+
+# Run analysis
+system = ForexAgentSystem()
+result = system.analyze("EUR/USD")
+
+# Format for Twitter (280 char limit)
+twitter_post = format_for_twitter(result, include_trade_params=True)
+print(twitter_post)
+# Output: 🟢 EUR/USD BUY @ 1.085
+#         🎯 Target: 1.095 | 🛡️ Stop: 1.08
+#         ⚠️ NFA | DYOR
+#         #Forex #Trading #EURUSD
+
+# Format for Telegram (markdown support)
+telegram_post = format_for_telegram(
+    result,
+    channel_name="FX Signals Pro"
+)
+
+# Format for Facebook (educational tone)
+facebook_post = format_for_facebook(result, educational_context=True)
+
+# Generate all formats at once
+posts = format_all_platforms(result)
+print(posts['twitter'])
+print(posts['telegram'])
+print(posts['facebook'])
+```
+
+**Key Features:**
+- ✅ Platform-specific formatting (Twitter 280 chars, Telegram markdown, Facebook long-form)
+- ✅ Professional FX trader voice
+- ✅ Automatic disclaimers included
+- ✅ Conditional trade parameters (only for BUY/SELL signals)
+- ✅ Custom hashtags and branding options
+
+See [`docs/SOCIAL_MEDIA_POSTS.md`](docs/SOCIAL_MEDIA_POSTS.md) for full documentation and API reference.
 
 ## 📁 Project Structure
 
