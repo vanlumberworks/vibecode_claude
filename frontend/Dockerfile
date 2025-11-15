@@ -36,6 +36,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/vite.config.ts ./vite.config.ts
 COPY --from=builder /app/node_modules ./node_modules
 
 # Expose port (Railway will override with $PORT)
