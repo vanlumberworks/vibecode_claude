@@ -1,9 +1,9 @@
 /* ============================================================================
-   FOREX AGENT SYSTEM - CUSTOM THEME
-   Dark Financial Terminal Aesthetic
+   FOREX AGENT SYSTEM - SHADCN DEFAULT DARK THEME
+   Modern Dark UI with Montserrat Typography
    ============================================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,44 +11,37 @@
 
 @layer base {
   :root {
-    /* Custom Color Palette - Dark Financial Terminal */
-    --bg-primary: 10 14 39;        /* Deep navy #0a0e27 */
-    --bg-secondary: 15 23 55;      /* Darker blue #0f1737 */
-    --bg-tertiary: 20 28 65;       /* Medium blue #141c41 */
+    /* Shadcn Default Dark Theme Colors - Enhanced Contrast */
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --radius: 0.5rem;
 
-    --gold: 45 93% 58%;            /* Amber/Gold #f59e0b */
-    --cyan: 189 94% 43%;           /* Cyan #06b6d4 */
-    --emerald: 160 84% 39%;        /* Emerald #10b981 */
-    --ruby: 0 72% 51%;             /* Ruby red #dc2626 */
-
-    --text-primary: 210 40% 98%;   /* Off-white #f8fafc */
-    --text-secondary: 215 16% 47%; /* Gray #71717a */
-    --text-muted: 215 14% 34%;     /* Darker gray #52525b */
-
-    --glow-gold: 0 0 20px rgba(245, 158, 11, 0.5);
-    --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.5);
-
-    /* Base shadcn variables adapted */
-    --background: var(--bg-primary);
-    --foreground: var(--text-primary);
-    --card: var(--bg-secondary);
-    --card-foreground: var(--text-primary);
-    --popover: var(--bg-secondary);
-    --popover-foreground: var(--text-primary);
-    --primary: var(--gold);
-    --primary-foreground: var(--bg-primary);
-    --secondary: var(--cyan);
-    --secondary-foreground: var(--bg-primary);
-    --muted: var(--bg-tertiary);
-    --muted-foreground: var(--text-secondary);
-    --accent: var(--emerald);
-    --accent-foreground: var(--text-primary);
-    --destructive: var(--ruby);
-    --destructive-foreground: var(--text-primary);
-    --border: 215 16% 25%;
-    --input: 215 16% 25%;
-    --ring: var(--gold);
-    --radius: 0.75rem;
+    /* Sidebar Colors */
+    --sidebar-background: 0 0% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 9%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 14.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 14.9%;
+    --sidebar-ring: 0 0% 83.1%;
   }
 }
 
@@ -60,111 +53,48 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Outfit', -apple-system, sans-serif;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'DM Serif Display', serif;
-    font-weight: 400;
-    letter-spacing: -0.02em;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
   }
 }
 
 /* ============================================================================
-   CUSTOM ANIMATIONS
+   MINIMAL ANIMATIONS
    ============================================================================ */
 
 @layer utilities {
-  /* Animated grid background */
-  .animated-grid {
-    background-image:
-      linear-gradient(rgba(245, 158, 11, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(245, 158, 11, 0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-    animation: grid-move 20s linear infinite;
-  }
-
-  @keyframes grid-move {
-    0% {
-      background-position: 0 0;
-    }
-    100% {
-      background-position: 50px 50px;
-    }
-  }
-
-  /* Scanline effect */
-  .scanline {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .scanline::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      to bottom,
-      transparent 0%,
-      rgba(245, 158, 11, 0.05) 50%,
-      transparent 100%
-    );
-    animation: scanline-move 3s linear infinite;
-    pointer-events: none;
-  }
-
-  @keyframes scanline-move {
-    0% {
-      transform: translateY(-100%);
-    }
-    100% {
-      transform: translateY(100%);
-    }
-  }
-
-  /* Glow effects */
-  .glow-gold {
-    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
-  }
-
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
-  }
-
-  .glow-emerald {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-  }
-
-  /* Text glow */
-  .text-glow-gold {
-    text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-  }
-
-  .text-glow-cyan {
-    text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
-  }
-
-  /* Glass morphism */
-  .glass {
-    background: rgba(15, 23, 55, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(245, 158, 11, 0.1);
-  }
-
-  /* Staggered fade-in animation */
-  @keyframes fade-in-up {
+  /* Subtle fade-in animation */
+  @keyframes fade-in {
     from {
       opacity: 0;
-      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out forwards;
+  }
+
+  /* Slide up animation */
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
     }
     to {
       opacity: 1;
@@ -172,77 +102,71 @@
     }
   }
 
-  .animate-fade-in-up {
-    animation: fade-in-up 0.6s ease-out forwards;
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out forwards;
   }
 
-  /* Pulse glow animation */
-  @keyframes pulse-glow {
+  /* Flowing gradient animation for timeline connectors */
+  @keyframes flowing-gradient {
+    0% {
+      background-position: 0% 0%;
+    }
+    100% {
+      background-position: 0% 300%;
+    }
+  }
+
+  .animate-flowing-gradient {
+    background: linear-gradient(
+      180deg,
+      rgba(52, 211, 153, 0.95) 0%,
+      rgba(16, 185, 129, 1) 20%,
+      rgba(5, 150, 105, 1) 40%,
+      rgba(4, 120, 87, 1) 60%,
+      rgba(5, 150, 105, 1) 80%,
+      rgba(52, 211, 153, 0.95) 100%
+    );
+    background-size: 100% 300%;
+    animation: flowing-gradient 3s ease-in-out infinite;
+  }
+
+  /* Pulse animation for step completion */
+  @keyframes pulse-complete {
     0%, 100% {
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+      opacity: 1;
+      transform: scaleY(1);
     }
     50% {
-      box-shadow: 0 0 30px rgba(245, 158, 11, 0.4);
-    }
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  /* Slide in from right */
-  @keyframes slide-in-right {
-    from {
-      opacity: 0;
-      transform: translateX(100px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  .animate-slide-in-right {
-    animation: slide-in-right 0.6s ease-out forwards;
-  }
-
-  /* Timeline dot pulse */
-  @keyframes dot-pulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1.2);
       opacity: 0.8;
+      transform: scaleY(1.05);
     }
   }
 
-  .animate-dot-pulse {
-    animation: dot-pulse 1.5s ease-in-out infinite;
+  .animate-pulse-complete {
+    animation: pulse-complete 0.5s ease-in-out;
   }
 }
 
 /* ============================================================================
-   CUSTOM SCROLLBAR
+   CUSTOM SCROLLBAR - Minimal Dark Theme
    ============================================================================ */
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--bg-primary));
+  background: hsl(var(--background));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--gold) / 0.3);
-  border-radius: 5px;
+  background: hsl(var(--border));
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--gold) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 
 /* ============================================================================
@@ -253,15 +177,4 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 2rem;
-}
-
-.section-divider {
-  height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    hsl(var(--gold) / 0.2) 50%,
-    transparent
-  );
-  margin: 2rem 0;
 }

@@ -18,7 +18,9 @@
       "Bash(git push:*)",
       "Bash(VITE_API_URL=https://fx-agent-prod-thrumming-smoke-7736.fly.dev pnpm build:*)",
       "Bash(git commit:*)",
-      "Bash(pnpm build:check:*)"
+      "Bash(pnpm build:check:*)",
+      "Skill(frontend-design)",
+      "Bash(npx shadcn@latest add card badge dialog tabs progress separator alert avatar collapsible input label textarea --overwrite --yes)"
     ]
   },
   "enableAllProjectMcpServers": true,

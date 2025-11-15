@@ -39,6 +39,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Local development
+        "http://localhost:3003",  # Local development (alternate port)
         "http://localhost:5173",  # Vite dev server
         "https://forex-agent-frontend-production.up.railway.app",  # Railway production
     ],
